@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 96%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 27 65% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 91%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 35%;
+    --accent: 38 87% 56%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 91%;
+    --input: 0 0% 85%;
+    --ring: 27 65% 50%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: theme('fontFamily.body');
+  }
+
+  body {
+    @apply bg-brand-gray-bg text-brand-black font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .section-banner {
+    @apply bg-brand-orange text-white px-4 py-2 font-heading uppercase tracking-wide font-bold text-sm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Compact markdown rendering inside proposal cards */
+  .card-prose {
+    @apply prose prose-sm max-w-none font-body text-brand-black
+      prose-headings:font-heading prose-headings:uppercase prose-headings:tracking-wide
+      prose-strong:text-brand-black prose-p:my-2 prose-ul:my-2 prose-li:my-0.5
+      prose-a:text-brand-orange;
+  }
+
+  .signature-line {
+    @apply border-b-2 border-brand-black h-10;
+  }
+}
+
+/* Markdown editor tweaks */
+.w-md-editor {
+  font-family: theme('fontFamily.body') !important;
+}
+
+/* ---------- Print styles (customer view / PDF) ---------- */
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .customer-proposal {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .proposal-card,
+  .acceptance-block,
+  .payment-block,
+  .grand-total-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .section-banner,
+  .grand-total-block {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Stack the acceptance signature columns when narrow */
+  @page {
+    margin: 0.5in;
+  }
+}
