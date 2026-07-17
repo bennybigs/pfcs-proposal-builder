@@ -25,16 +25,6 @@ export function cardFromTemplate(template: CardTemplate): Card {
   };
 }
 
-export function grandTotal(proposal: Proposal): number {
-  return proposal.cards.reduce(
-    (sum, c) =>
-      c.isEnabled && c.hasPrice && c.includeInTotal && typeof c.price === 'number'
-        ? sum + c.price
-        : sum,
-    0
-  );
-}
-
 interface ProposalsState {
   proposals: Record<string, Proposal>;
   createProposal: (templateId: string | null, customerName: string) => Proposal;

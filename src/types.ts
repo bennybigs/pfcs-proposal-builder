@@ -13,6 +13,12 @@ export interface Proposal {
   cards: Card[]; // ordered
 
   showGrandTotalToCustomer: boolean; // default true
+  /** Additional markup applied on top of the summed card prices (percent, e.g. 10 = 10%). */
+  totalMarkupPct?: number;
+  /** true: markup renders as its own labeled line; false: folded invisibly into card prices. */
+  showTotalMarkupToCustomer?: boolean;
+  /** Customer-facing label for the markup line when visible. */
+  totalMarkupLabel?: string;
   paymentSchedule: PaymentSchedule;
   disclaimers?: string; // markdown
 }
@@ -39,7 +45,9 @@ export interface Card {
   content: string; // markdown
   isEnabled: boolean;
   hasPrice: boolean;
-  price?: number; // dollars
+  price?: number; // dollars — the internal/base amount entered
+  /** Per-card markup (percent). Customer sees price * (1 + markupPct/100). */
+  markupPct?: number;
   showPriceToCustomer: boolean; // default true when hasPrice=true
   includeInTotal: boolean; // default true when hasPrice=true
 }

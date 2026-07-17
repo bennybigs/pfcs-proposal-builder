@@ -1,7 +1,7 @@
 import type { CompanySnapshot, Proposal } from '@/types';
 import { Markdown } from '@/components/Markdown';
 import { AcceptanceBlock } from '@/components/customer/AcceptanceBlock';
-import { grandTotal } from '@/store/useProposalStore';
+import { cardDisplayPrice, proposalPricing } from '@/lib/pricing';
 import { addDays, formatCurrency, formatDateLong } from '@/lib/format';
 import { PROPOSAL_VALID_DAYS } from '@/constants/defaults';
 
@@ -36,9 +36,11 @@ export function CustomerProposal({
   proposal: Proposal;
   company: CompanySnapshot;
 }) {
-  const total = grandTotal(proposal);
+  const pricing = proposalPricing(proposal);
+  const total = pricing.total;
   const visibleCards = proposal.cards.filter((c) => c.isEnabled);
   const showTotal = proposal.showGrandTotalToCustomer;
+  const showMarkupLine = showTotal && pricing.markupVisible && pricing.markupAmount !== 0;
 
   return (
     <div className="customer-proposal mx-auto max-w-[820px] bg-white p-8 shadow-md sm:p-10">
@@ -105,13 +107,15 @@ export function CustomerProposal({
             <div className="section-banner">{card.title}</div>
             <div className="border border-t-0 border-brand-gray-light bg-white p-5">
               <Markdown>{card.content}</Markdown>
-              {card.hasPrice && card.showPriceToCustomer && typeof card.price === 'number' && (
-                <div className="mt-4 flex justify-end border-t border-brand-gray-light pt-3">
-                  <span className="font-heading text-lg font-bold tracking-wide">
-                    {formatCurrency(card.price)}
-                  </span>
-                </div>
-              )}
+              {card.hasPrice &&
+                card.showPriceToCustomer &&
+                cardDisplayPrice(card, proposal) !== undefined && (
+                  <div className="mt-4 flex justify-end border-t border-brand-gray-light pt-3">
+                    <span className="font-heading text-lg font-bold tracking-wide">
+                      {formatCurrency(cardDisplayPrice(card, proposal) as number)}
+                    </span>
+                  </div>
+                )}
             </div>
           </section>
         ))}
@@ -140,6 +144,22 @@ export function CustomerProposal({
           </div>
         </div>
       </section>
+
+      {/* Visible markup breakdown */}
+      {showMarkupLine && (
+        <section className="mt-8 border border-brand-gray-light bg-white px-5 py-3">
+          <div className="flex items-baseline justify-between py-1 text-sm">
+            <span>Subtotal</span>
+            <span className="font-semibold">{formatCurrency(pricing.subtotal)}</span>
+          </div>
+          <div className="flex items-baseline justify-between border-t border-brand-gray-light py-1 pt-2 text-sm">
+            <span>
+              {pricing.markupLabel} ({pricing.markupPct}%)
+            </span>
+            <span className="font-semibold">{formatCurrency(pricing.markupAmount)}</span>
+          </div>
+        </section>
+      )}
 
       {/* Grand total */}
       {showTotal && (

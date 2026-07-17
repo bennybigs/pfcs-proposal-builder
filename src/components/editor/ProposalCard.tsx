@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useProposalStore } from '@/store/useProposalStore';
 import { formatCurrency } from '@/lib/format';
+import { cardMarkedPrice } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 
 export function ProposalCard({
@@ -68,8 +69,15 @@ export function ProposalCard({
           onChange={(e) => updateCard(proposalId, card.id, { title: e.target.value })}
         />
         {card.hasPrice && typeof card.price === 'number' && (
-          <span className="whitespace-nowrap font-heading text-base font-bold text-brand-orange">
-            {formatCurrency(card.price)}
+          <span
+            className="whitespace-nowrap font-heading text-base font-bold text-brand-orange"
+            title={
+              (card.markupPct ?? 0) !== 0
+                ? `Base ${formatCurrency(card.price)} + ${card.markupPct}% markup`
+                : undefined
+            }
+          >
+            {formatCurrency(cardMarkedPrice(card) ?? card.price)}
           </span>
         )}
         <DropdownMenu>
@@ -116,6 +124,9 @@ export function ProposalCard({
       {/* Price badges row */}
       {card.hasPrice && (
         <div className="flex items-center justify-end gap-1.5 border-t border-brand-gray-bg px-3 py-1.5">
+          {(card.markupPct ?? 0) !== 0 && (
+            <Badge variant="outline">+{card.markupPct}% markup</Badge>
+          )}
           <Badge variant={card.showPriceToCustomer ? 'default' : 'muted'}>
             {card.showPriceToCustomer ? 'Shown to customer' : 'Hidden'}
           </Badge>

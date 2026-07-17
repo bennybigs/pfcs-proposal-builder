@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { uuid } from '@/lib/uuid';
+import { cardMarkedPrice } from '@/lib/pricing';
+import { formatCurrency } from '@/lib/format';
 
 export function CardEditorPanel({
   proposalId,
@@ -130,6 +132,34 @@ export function CardEditorPanel({
                     }
                   />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="card-markup">Markup %</Label>
+                <div className="relative">
+                  <Input
+                    id="card-markup"
+                    type="number"
+                    step={0.5}
+                    className="pr-7"
+                    value={card.markupPct ?? ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      updateCard(proposalId, card.id, {
+                        markupPct: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                  />
+                  <span className="absolute right-3 top-2 text-sm text-brand-steel">%</span>
+                </div>
+                {typeof card.price === 'number' && (card.markupPct ?? 0) !== 0 && (
+                  <p className="text-xs text-brand-steel">
+                    Customer line price:{' '}
+                    <span className="font-semibold">
+                      {formatCurrency(cardMarkedPrice(card) ?? 0)}
+                    </span>{' '}
+                    (base {formatCurrency(card.price)})
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <Label>Show to customer?</Label>

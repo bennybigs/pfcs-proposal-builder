@@ -20,7 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { grandTotal, useProposalStore } from '@/store/useProposalStore';
+import { useProposalStore } from '@/store/useProposalStore';
+import { grandTotal } from '@/lib/pricing';
 import { STATUS_META } from '@/constants/defaults';
 import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
