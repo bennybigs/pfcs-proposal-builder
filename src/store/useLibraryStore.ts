@@ -58,11 +58,12 @@ export const useLibraryStore = create<LibraryState>()(
       storage: createJSONStorage(() => debouncedLocalStorage),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<LibraryState>;
-        return {
-          ...current,
-          ...p,
-          settings: { ...current.settings, ...(p.settings ?? {}) },
-        };
+        const settings = { ...current.settings, ...(p.settings ?? {}) };
+        // Browsers that stored the old placeholder pick up the real logo.
+        if (settings.logoUrl === '/logo.svg') {
+          settings.logoUrl = '/logo.jpg';
+        }
+        return { ...current, ...p, settings };
       },
     }
   )

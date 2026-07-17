@@ -37,7 +37,7 @@ export default function CustomerView() {
   if (!payload) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-8 text-center">
-        <img src="/logo.svg" alt="PFCS" className="h-16 max-w-[320px] object-contain" />
+        <img src="/logo.jpg" alt="PFCS" className="h-16 max-w-[320px] object-contain" />
         <h1 className="font-heading text-2xl font-bold uppercase tracking-wide">
           Proposal Not Found
         </h1>

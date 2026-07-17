@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   address: 'Orrville, Ohio',
   phone: '',
   email: '',
-  logoUrl: '/logo.svg',
+  logoUrl: '/logo.jpg',
   defaultDisclaimers: DEFAULT_DISCLAIMERS,
   proposalNumberPrefix: 'PFCS-2026-',
   nextProposalNumber: 1,
