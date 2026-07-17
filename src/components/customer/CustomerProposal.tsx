@@ -46,7 +46,7 @@ export function CustomerProposal({
       <header className="mb-8 flex flex-col items-start justify-between gap-4 border-b-4 border-brand-orange pb-6 sm:flex-row sm:items-center">
         <div className="flex items-center gap-4">
           {company.logoUrl && (
-            <img src={company.logoUrl} alt={company.companyName} className="h-16 max-w-[260px] object-contain" />
+            <img src={company.logoUrl} alt={company.companyName} className="h-24 max-w-[400px] object-contain" />
           )}
         </div>
         <div className="text-left sm:text-right">

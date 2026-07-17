@@ -8,8 +8,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        'brand-orange': '#D2782D',
-        'brand-orange-light': '#F0A52D',
+        'brand-orange': '#E8930C',
+        'brand-orange-light': '#F7B733',
         'brand-black': '#1A1A1A',
         'brand-steel': '#5A5A5A',
         'brand-gray-light': '#E8E8E8',

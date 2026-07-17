@@ -199,7 +199,7 @@ export default function Editor() {
       />
 
       {/* Mobile tab bar */}
-      <div className="sticky top-14 z-30 flex border-b bg-white lg:hidden">
+      <div className="sticky top-16 z-30 flex border-b bg-white lg:hidden">
         {(
           [
             ['library', 'Library'],
