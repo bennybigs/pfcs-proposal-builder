@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 const NAV = [
   { to: '/', label: 'Proposals' },
@@ -10,12 +11,13 @@ const NAV = [
 /** Simple header for Dashboard / Library / Settings pages. */
 export function AppHeader({ right }: { right?: React.ReactNode }) {
   const { pathname } = useLocation();
+  const logoUrl = useLibraryStore((s) => s.settings.logoUrl);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="PFCS" className="h-8" />
+            <img src={logoUrl} alt="PFCS" className="h-8 max-w-[180px] object-contain" />
           </Link>
           <nav className="flex items-center gap-1">
             {NAV.map((item) => (

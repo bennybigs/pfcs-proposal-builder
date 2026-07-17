@@ -2,7 +2,7 @@ import LZString from 'lz-string';
 import type { CompanySettings, CompanySnapshot, Proposal, SharePayload } from '@/types';
 
 /** Data-URL logos beyond this size are omitted from share links to keep URLs practical. */
-const MAX_EMBEDDED_LOGO_CHARS = 80_000;
+export const MAX_EMBEDDED_LOGO_CHARS = 80_000;
 
 export function companySnapshot(settings: CompanySettings): CompanySnapshot {
   const { companyName, tagline, address, phone, email, logoUrl } = settings;

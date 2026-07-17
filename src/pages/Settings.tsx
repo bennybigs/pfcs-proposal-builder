@@ -7,20 +7,63 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatProposalNumber } from '@/lib/proposalNumber';
+import { MAX_EMBEDDED_LOGO_CHARS } from '@/lib/shareLink';
+
+/**
+ * Downscale an uploaded logo to display size and re-encode it so the data URL
+ * stays small enough to embed in share links (see MAX_EMBEDDED_LOGO_CHARS).
+ * Falls back to JPEG on a white background if the PNG is still too large.
+ */
+function fileToLogoDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX_H = 480;
+      const MAX_W = 1600;
+      const scale = Math.min(1, MAX_H / img.height, MAX_W / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas unavailable'));
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      let dataUrl = canvas.toDataURL('image/png');
+      if (dataUrl.length > MAX_EMBEDDED_LOGO_CHARS) {
+        const jpegCanvas = document.createElement('canvas');
+        jpegCanvas.width = canvas.width;
+        jpegCanvas.height = canvas.height;
+        const jctx = jpegCanvas.getContext('2d');
+        if (jctx) {
+          jctx.fillStyle = '#ffffff';
+          jctx.fillRect(0, 0, jpegCanvas.width, jpegCanvas.height);
+          jctx.drawImage(canvas, 0, 0);
+          dataUrl = jpegCanvas.toDataURL('image/jpeg', 0.85);
+        }
+      }
+      resolve(dataUrl);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Could not read image file'));
+    };
+    img.src = objectUrl;
+  });
+}
 
 export default function Settings() {
   const settings = useLibraryStore((s) => s.settings);
   const updateSettings = useLibraryStore((s) => s.updateSettings);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateSettings({ logoUrl: reader.result });
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleLogoUpload = async (file: File) => {
+    try {
+      const logoUrl = await fileToLogoDataUrl(file);
+      updateSettings({ logoUrl });
+    } catch (err) {
+      alert(`Could not process logo: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   return (

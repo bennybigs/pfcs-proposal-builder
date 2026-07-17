@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { STATUS_META } from '@/constants/defaults';
 import { useProposalStore } from '@/store/useProposalStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 export type SaveStatus = 'saved' | 'saving';
 
@@ -70,13 +71,14 @@ export function TopBar({
   onDelete: () => void;
 }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
+  const logoUrl = useLibraryStore((s) => s.settings.logoUrl);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
       <div className="flex h-14 items-center gap-3 px-4">
         <Link to="/" className="shrink-0" title="Back to dashboard">
-          <img src="/logo.svg" alt="PFCS" className="h-8" />
+          <img src={logoUrl} alt="PFCS" className="h-8 max-w-[160px] object-contain" />
         </Link>
 
         <div className="flex min-w-0 flex-1 items-center gap-2">
