@@ -91,6 +91,16 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
             value={proposal.salesRep}
             onChange={(v) => updateProposal(proposal.id, { salesRep: v })}
           />
+          <Field
+            label="Phone"
+            value={proposal.salesRepPhone ?? ''}
+            onChange={(v) => updateProposal(proposal.id, { salesRepPhone: v })}
+          />
+          <Field
+            label="Email"
+            value={proposal.salesRepEmail ?? ''}
+            onChange={(v) => updateProposal(proposal.id, { salesRepEmail: v })}
+          />
         </div>
       </div>
     </div>

@@ -87,9 +87,9 @@ export function CustomerProposal({
           heading="Project Manager"
           lines={[
             proposal.salesRep,
+            proposal.salesRepPhone,
+            proposal.salesRepEmail,
             company.companyName,
-            company.phone,
-            company.email,
           ]}
         />
       </div>

@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Copy, Eye, EyeOff, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Eye, EyeOff, FileDown, GripVertical, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import type { Card } from '@/types';
 import { Markdown } from '@/components/Markdown';
 import { Badge } from '@/components/ui/badge';
@@ -23,11 +23,13 @@ export function ProposalCard({
   card,
   selected,
   onSelect,
+  onExportPdf,
 }: {
   proposalId: string;
   card: Card;
   selected: boolean;
   onSelect: (cardId: string) => void;
+  onExportPdf: (cardId: string) => void;
 }) {
   const updateCard = useProposalStore((s) => s.updateCard);
   const removeCard = useProposalStore((s) => s.removeCard);
@@ -92,6 +94,9 @@ export function ProposalCard({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => duplicateCard(proposalId, card.id)}>
               <Copy /> Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onExportPdf(card.id)}>
+              <FileDown /> Print / PDF this card
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => updateCard(proposalId, card.id, { isEnabled: !card.isEnabled })}

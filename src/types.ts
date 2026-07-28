@@ -1,13 +1,16 @@
 export interface Proposal {
   id: string; // uuid
   proposalNumber: string; // "PFCS-2026-0001"
-  status: 'draft' | 'sent' | 'accepted' | 'declined';
+  status: 'draft' | 'sent' | 'accepted' | 'declined' | 'contract';
   createdAt: string; // ISO
   updatedAt: string; // ISO
 
   customer: CustomerInfo;
   project: ProjectInfo;
+  /** Project manager name (field kept as salesRep for storage compatibility). */
   salesRep: string;
+  salesRepPhone?: string;
+  salesRepEmail?: string;
 
   intro?: string; // optional custom intro paragraph
   cards: Card[]; // ordered

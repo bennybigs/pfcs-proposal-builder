@@ -1,5 +1,5 @@
 import html2pdf from 'html2pdf.js';
-import type { Proposal } from '@/types';
+import type { Card, Proposal } from '@/types';
 import { lastName } from '@/lib/format';
 
 export function pdfFilename(proposal: Proposal): string {
@@ -7,12 +7,21 @@ export function pdfFilename(proposal: Proposal): string {
   return `${proposal.proposalNumber}-${last}.pdf`;
 }
 
+export function cardPdfFilename(proposal: Proposal, card: Card): string {
+  const slug = card.title.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'card';
+  return `${proposal.proposalNumber}-${slug}.pdf`;
+}
+
 /** Render the given element (a customer-view proposal) to a downloaded PDF. */
-export async function exportElementToPdf(element: HTMLElement, proposal: Proposal): Promise<void> {
+export async function exportElementToPdf(
+  element: HTMLElement,
+  proposal: Proposal,
+  filename?: string
+): Promise<void> {
   await html2pdf()
     .set({
       margin: [0.5, 0.5, 0.6, 0.5],
-      filename: pdfFilename(proposal),
+      filename: filename ?? pdfFilename(proposal),
       image: { type: 'jpeg', quality: 0.96 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },

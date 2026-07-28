@@ -57,4 +57,5 @@ export const STATUS_META: Record<string, { label: string; className: string }> =
   sent: { label: 'Sent', className: 'bg-brand-orange-light/20 text-brand-orange' },
   accepted: { label: 'Accepted', className: 'bg-green-100 text-green-800' },
   declined: { label: 'Declined', className: 'bg-red-100 text-red-700' },
+  contract: { label: 'Contract', className: 'bg-brand-black text-brand-orange-light' },
 };

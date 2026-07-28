@@ -20,6 +20,7 @@ import { PaymentScheduleBlock } from '@/components/editor/PaymentScheduleBlock';
 import { GrandTotal } from '@/components/editor/GrandTotal';
 import { CardEditorPanel } from '@/components/editor/CardEditorPanel';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { SingleCardDocument } from '@/components/customer/SingleCardDocument';
 import { AcceptanceBlock } from '@/components/customer/AcceptanceBlock';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +29,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cardFromTemplate, useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
-import { exportElementToPdf } from '@/lib/pdfExport';
+import { cardPdfFilename, exportElementToPdf } from '@/lib/pdfExport';
 import {
   downloadTextFile,
   generateCustomerCsv,
@@ -55,8 +56,10 @@ export default function Editor() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [exportCardId, setExportCardId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const cardPdfContainerRef = useRef<HTMLDivElement>(null);
 
   // Autosave indicator: any store change flips to "saving", settles to "saved".
   useEffect(() => {
@@ -71,6 +74,27 @@ export default function Editor() {
       if (timer) window.clearTimeout(timer);
     };
   }, []);
+
+  // Per-card PDF export: once the hidden single-card document is mounted,
+  // print it to a file and clear the request.
+  useEffect(() => {
+    if (!exportCardId || !proposal) return;
+    const card = proposal.cards.find((c) => c.id === exportCardId);
+    const el = cardPdfContainerRef.current;
+    if (!card || !el) {
+      setExportCardId(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      exportElementToPdf(el, proposal, cardPdfFilename(proposal, card))
+        .catch((err) =>
+          alert(`Card PDF export failed: ${err instanceof Error ? err.message : String(err)}`)
+        )
+        .finally(() => setExportCardId(null));
+    }, 50);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportCardId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -284,6 +308,7 @@ export default function Editor() {
                           setSelectedCardId(cardId);
                           setMobileTab('editor');
                         }}
+                        onExportPdf={(cardId) => setExportCardId(cardId)}
                       />
                     ))}
                   </div>
@@ -371,6 +396,22 @@ export default function Editor() {
           <CustomerProposal proposal={proposal} company={companySnapshot(settings)} />
         </div>
       </div>
+
+      {/* Offscreen render target for single-card PDF export */}
+      {exportCardId && proposal.cards.some((c) => c.id === exportCardId) && (
+        <div
+          aria-hidden
+          style={{ position: 'fixed', left: '-10000px', top: 0, width: '816px', zIndex: -1 }}
+        >
+          <div ref={cardPdfContainerRef}>
+            <SingleCardDocument
+              card={proposal.cards.find((c) => c.id === exportCardId)!}
+              proposal={proposal}
+              company={companySnapshot(settings)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
