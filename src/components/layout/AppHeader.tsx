@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { InstallAppButton } from '@/components/layout/InstallAppButton';
 
 const NAV = [
   { to: '/', label: 'Proposals' },
@@ -36,7 +37,10 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
             ))}
           </nav>
         </div>
-        {right}
+        <div className="flex items-center gap-2">
+          <InstallAppButton />
+          {right}
+        </div>
       </div>
     </header>
   );
