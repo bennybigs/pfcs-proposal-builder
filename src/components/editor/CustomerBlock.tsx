@@ -63,7 +63,7 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
         <div className="space-y-3">
           <div className="section-banner -mx-1 rounded">Project Location</div>
           <Field
-            label="Reference Name"
+            label="Project Name"
             value={proposal.project.referenceName}
             placeholder="Smith Family Barndominium"
             onChange={(v) => setProject({ referenceName: v })}
