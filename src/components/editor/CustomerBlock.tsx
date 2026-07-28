@@ -61,7 +61,7 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
           />
         </div>
         <div className="space-y-3">
-          <div className="section-banner -mx-1 rounded">Project Location</div>
+          <div className="section-banner -mx-1 rounded">Project</div>
           <Field
             label="Project Name"
             value={proposal.project.referenceName}

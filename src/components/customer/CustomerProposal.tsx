@@ -75,7 +75,7 @@ export function CustomerProposal({
           ]}
         />
         <InfoColumn
-          heading="Project Location"
+          heading="Project"
           lines={[
             proposal.project.referenceName,
             proposal.project.streetAddress,
