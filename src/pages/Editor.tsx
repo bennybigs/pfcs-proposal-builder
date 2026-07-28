@@ -22,6 +22,7 @@ import { CardEditorPanel } from '@/components/editor/CardEditorPanel';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
 import { SingleCardDocument } from '@/components/customer/SingleCardDocument';
 import { AcceptanceBlock } from '@/components/customer/AcceptanceBlock';
+import { SignatureSection } from '@/components/customer/SignatureSection';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -383,6 +384,29 @@ export default function Editor() {
                   The Acceptance section is fixed and always appears last on every proposal.
                 </p>
               </div>
+
+              {/* Electronic signing preview — the live button exists on the shared link */}
+              {proposal.salesRepEmail?.trim() || settings.email?.trim() ? (
+                <div className="relative">
+                  <div className="pointer-events-none opacity-80">
+                    <SignatureSection proposal={proposal} company={companySnapshot(settings)} />
+                  </div>
+                  <p className="mt-1 text-center text-xs italic text-brand-steel">
+                    Preview only — customers sign on the shared link, where this button is live.
+                    Signing notifies {proposal.salesRepEmail?.trim() || settings.email} and the
+                    email includes a one-click "mark as Contract" button.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-brand-orange bg-brand-orange/5 p-4 text-sm text-brand-steel">
+                  <strong className="text-brand-black">
+                    Electronic signing is OFF for this proposal.
+                  </strong>{' '}
+                  Add a Project Manager email above (or a company email in Settings) and the
+                  customer's shared link will include an "Accept &amp; Sign Electronically"
+                  section that notifies you when they sign.
+                </div>
+              )}
             </div>
           </main>
 
@@ -419,6 +443,10 @@ export default function Editor() {
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto bg-brand-gray-bg p-4 sm:p-6">
           <DialogTitle className="sr-only">Customer Preview</DialogTitle>
           <CustomerProposal proposal={proposal} company={companySnapshot(settings)} />
+          {/* Inert copy of the e-sign section so Preview matches the shared link */}
+          <div className="pointer-events-none mx-auto w-full max-w-[820px] bg-white px-8 pb-10 opacity-90 shadow-md sm:px-10">
+            <SignatureSection proposal={proposal} company={companySnapshot(settings)} />
+          </div>
         </DialogContent>
       </Dialog>
 
