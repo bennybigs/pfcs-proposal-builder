@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { SignatureSection } from '@/components/customer/SignatureSection';
 import { Button } from '@/components/ui/button';
 import { decodeShareHash } from '@/lib/shareLink';
 import { useProposalStore } from '@/store/useProposalStore';
@@ -71,6 +72,9 @@ export default function CustomerView() {
         </Button>
       </div>
       <CustomerProposal proposal={payload.p} company={payload.c} />
+      <div className="mx-auto max-w-[820px] bg-white px-8 pb-10 shadow-md sm:px-10">
+        <SignatureSection proposal={payload.p} company={payload.c} />
+      </div>
     </div>
   );
 }
