@@ -74,6 +74,14 @@ export default function CustomerView() {
       <CustomerProposal proposal={payload.p} company={payload.c} />
       <div className="mx-auto max-w-[820px] bg-white px-8 pb-10 shadow-md sm:px-10">
         <SignatureSection proposal={payload.p} company={payload.c} />
+        {isOwner && !(payload.p.salesRepEmail?.trim() || payload.c.email?.trim()) && (
+          <div className="no-print mt-8 rounded-lg border-2 border-dashed border-brand-orange bg-brand-orange/5 p-4 text-sm text-brand-steel">
+            <strong className="text-brand-black">Only you can see this note:</strong> the
+            electronic signing section is hidden because this proposal has no Project Manager
+            email (and Settings has no company email) to notify. Add one in the builder, then
+            generate a fresh share link.
+          </div>
+        )}
       </div>
     </div>
   );

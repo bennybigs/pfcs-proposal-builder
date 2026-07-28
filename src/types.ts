@@ -105,6 +105,9 @@ export interface CompanySettings {
   proposalNumberPrefix: string; // "PFCS-2026-"
   nextProposalNumber: number; // counter, formatted to 4 digits
   defaultSalesRep: string;
+  /** Seeded onto new proposals as the project manager's contact info. */
+  defaultSalesRepPhone?: string;
+  defaultSalesRepEmail?: string;
 }
 
 /** Snapshot of company info embedded in share links so the customer view is self-contained. */

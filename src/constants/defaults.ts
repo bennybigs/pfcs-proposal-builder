@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   proposalNumberPrefix: 'PFCS-2026-',
   nextProposalNumber: 1,
   defaultSalesRep: 'Ben Stahl',
+  defaultSalesRepPhone: '',
+  defaultSalesRepEmail: '',
 };
 
 export const PROPOSAL_VALID_DAYS = 14;

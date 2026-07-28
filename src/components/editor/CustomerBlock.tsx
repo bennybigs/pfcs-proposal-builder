@@ -101,6 +101,10 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
             value={proposal.salesRepEmail ?? ''}
             onChange={(v) => updateProposal(proposal.id, { salesRepEmail: v })}
           />
+          <p className="text-xs leading-snug text-brand-steel">
+            The email receives the notification when the customer e-signs — without it, the
+            signing section is hidden on the customer's link.
+          </p>
         </div>
       </div>
     </div>

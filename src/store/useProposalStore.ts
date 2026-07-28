@@ -87,6 +87,8 @@ export const useProposalStore = create<ProposalsState>()(
               referenceName: last ? `${last} ${suffix}` : suffix,
             },
             salesRep: lib.settings.defaultSalesRep,
+            salesRepPhone: lib.settings.defaultSalesRepPhone ?? '',
+            salesRepEmail: lib.settings.defaultSalesRepEmail ?? '',
             intro: '',
             cards,
             showGrandTotalToCustomer: true,

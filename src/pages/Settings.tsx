@@ -140,11 +140,31 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Default Sales Rep</Label>
+                <Label>Default Project Manager</Label>
                 <Input
                   value={settings.defaultSalesRep}
                   onChange={(e) => updateSettings({ defaultSalesRep: e.target.value })}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Default PM Phone</Label>
+                <Input
+                  value={settings.defaultSalesRepPhone ?? ''}
+                  onChange={(e) => updateSettings({ defaultSalesRepPhone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Default PM Email</Label>
+                <Input
+                  value={settings.defaultSalesRepEmail ?? ''}
+                  placeholder="pm@yourcompany.com"
+                  onChange={(e) => updateSettings({ defaultSalesRepEmail: e.target.value })}
+                />
+                <p className="text-xs text-brand-steel">
+                  Seeded onto new proposals and used to notify the project manager when a customer
+                  signs electronically. Without an email here or on the proposal, the signing
+                  section stays hidden on the customer's link.
+                </p>
               </div>
             </div>
           </section>
