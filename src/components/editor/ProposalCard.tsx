@@ -93,7 +93,7 @@ export function ProposalCard({
               <Pencil /> Edit content
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => duplicateCard(proposalId, card.id)}>
-              <Copy /> Duplicate
+              <Copy /> Duplicate in this proposal
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onExportPdf(card.id)}>
               <FileDown /> Print / PDF this card
@@ -109,7 +109,7 @@ export function ProposalCard({
               className="text-red-600 focus:text-red-600"
               onClick={() => removeCard(proposalId, card.id)}
             >
-              <Trash2 /> Delete card
+              <Trash2 /> Remove from proposal
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
