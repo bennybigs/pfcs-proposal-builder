@@ -54,8 +54,21 @@ export const useLibraryStore = create<LibraryState>()(
     }),
     {
       name: STORAGE_KEYS.library,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => debouncedLocalStorage),
+      migrate: (persisted, version) => {
+        const p = persisted as Partial<LibraryState>;
+        // v2: deliver seed templates added after a browser first stored its library.
+        if (version < 2 && Array.isArray(p.templates)) {
+          for (const id of ['oh-tax-exemption']) {
+            if (!p.templates.some((t) => t.id === id)) {
+              const seed = SEED_CARD_TEMPLATES.find((t) => t.id === id);
+              if (seed) p.templates.push(seed);
+            }
+          }
+        }
+        return p;
+      },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<LibraryState>;
         const settings = { ...current.settings, ...(p.settings ?? {}) };

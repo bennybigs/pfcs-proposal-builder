@@ -41,6 +41,7 @@ export function CustomerProposal({
   const visibleCards = proposal.cards.filter((c) => c.isEnabled);
   const showTotal = proposal.showGrandTotalToCustomer;
   const showMarkupLine = showTotal && pricing.markupVisible && pricing.markupAmount !== 0;
+  const showTaxLine = showTotal && pricing.taxEnabled && pricing.taxAmount !== 0;
 
   return (
     <div className="customer-proposal mx-auto max-w-[820px] bg-white p-8 shadow-md sm:p-10">
@@ -76,16 +77,16 @@ export function CustomerProposal({
         <InfoColumn
           heading="Project Location"
           lines={[
+            proposal.project.referenceName,
             proposal.project.streetAddress,
             proposal.project.cityStateZip,
             proposal.project.county ? `${proposal.project.county} County` : undefined,
           ]}
         />
         <InfoColumn
-          heading="Project"
+          heading="Project Manager"
           lines={[
-            proposal.project.referenceName,
-            proposal.salesRep ? `Sales Rep: ${proposal.salesRep}` : undefined,
+            proposal.salesRep,
             company.companyName,
             company.phone,
             company.email,
@@ -145,19 +146,29 @@ export function CustomerProposal({
         </div>
       </section>
 
-      {/* Visible markup breakdown */}
-      {showMarkupLine && (
+      {/* Subtotal / markup / sales tax breakdown */}
+      {(showMarkupLine || showTaxLine) && (
         <section className="mt-8 border border-brand-gray-light bg-white px-5 py-3">
           <div className="flex items-baseline justify-between py-1 text-sm">
             <span>Subtotal</span>
-            <span className="font-semibold">{formatCurrency(pricing.subtotal)}</span>
-          </div>
-          <div className="flex items-baseline justify-between border-t border-brand-gray-light py-1 pt-2 text-sm">
-            <span>
-              {pricing.markupLabel} ({pricing.markupPct}%)
+            <span className="font-semibold">
+              {formatCurrency(showMarkupLine ? pricing.subtotal : pricing.preTaxTotal)}
             </span>
-            <span className="font-semibold">{formatCurrency(pricing.markupAmount)}</span>
           </div>
+          {showMarkupLine && (
+            <div className="flex items-baseline justify-between border-t border-brand-gray-light py-1 pt-2 text-sm">
+              <span>
+                {pricing.markupLabel} ({pricing.markupPct}%)
+              </span>
+              <span className="font-semibold">{formatCurrency(pricing.markupAmount)}</span>
+            </div>
+          )}
+          {showTaxLine && (
+            <div className="flex items-baseline justify-between border-t border-brand-gray-light py-1 pt-2 text-sm">
+              <span>Sales Tax ({pricing.taxRatePct}%)</span>
+              <span className="font-semibold">{formatCurrency(pricing.taxAmount)}</span>
+            </div>
+          )}
         </section>
       )}
 

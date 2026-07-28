@@ -3,13 +3,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useProposalStore } from '@/store/useProposalStore';
-import { DEFAULT_MARKUP_LABEL, proposalPricing } from '@/lib/pricing';
+import { DEFAULT_MARKUP_LABEL, DEFAULT_TAX_RATE_PCT, proposalPricing } from '@/lib/pricing';
 import { formatCurrency } from '@/lib/format';
 
 export function GrandTotal({ proposal }: { proposal: Proposal }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
   const pricing = proposalPricing(proposal);
   const markupVisible = proposal.showTotalMarkupToCustomer ?? false;
+  const taxEnabled = proposal.applySalesTax ?? false;
 
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-sm">
@@ -57,6 +58,51 @@ export function GrandTotal({ proposal }: { proposal: Proposal }) {
             </div>
           )}
         </div>
+
+        <div className="flex flex-wrap items-end gap-4 border-t border-brand-gray-bg pt-3">
+          <label className="flex items-center gap-2 pb-2 text-xs font-semibold uppercase tracking-wide text-brand-steel">
+            <Switch
+              checked={taxEnabled}
+              onCheckedChange={(v) =>
+                updateProposal(proposal.id, {
+                  applySalesTax: v,
+                  ...(v && proposal.taxRatePct === undefined
+                    ? { taxRatePct: DEFAULT_TAX_RATE_PCT }
+                    : {}),
+                })
+              }
+            />
+            {taxEnabled ? 'Sales tax on' : 'Sales tax off'}
+          </label>
+          {taxEnabled && (
+            <div className="space-y-1">
+              <Label htmlFor="tax-rate">Tax rate %</Label>
+              <div className="relative w-28">
+                <Input
+                  id="tax-rate"
+                  type="number"
+                  min={0}
+                  step={0.25}
+                  className="pr-6 text-right"
+                  value={proposal.taxRatePct ?? DEFAULT_TAX_RATE_PCT}
+                  onChange={(e) =>
+                    updateProposal(proposal.id, {
+                      taxRatePct: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+                <span className="absolute right-2 top-2 text-sm text-brand-steel">%</span>
+              </div>
+            </div>
+          )}
+          {taxEnabled && (
+            <p className="pb-2 text-xs text-brand-steel">
+              Adds {formatCurrency(pricing.taxAmount)} on {formatCurrency(pricing.preTaxTotal)} —
+              shown to the customer as its own line.
+            </p>
+          )}
+        </div>
+
         <p className="text-xs text-brand-steel">
           Internal breakdown: base {formatCurrency(pricing.baseTotal)}
           {pricing.subtotal !== pricing.baseTotal && (

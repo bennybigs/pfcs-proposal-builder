@@ -70,6 +70,19 @@ export function generateEstimateCsv(proposal: Proposal): string {
       pricing.markupAmount.toFixed(2),
     ]);
   }
+  if (pricing.taxEnabled && pricing.taxAmount !== 0) {
+    rows.push([
+      proposal.proposalNumber,
+      proposal.customer.fullName,
+      estimateDate,
+      expirationDate,
+      'Sales Tax',
+      `Ohio sales tax (${pricing.taxRatePct}%) on ${pricing.preTaxTotal.toFixed(2)}`,
+      1,
+      pricing.taxAmount.toFixed(2),
+      pricing.taxAmount.toFixed(2),
+    ]);
+  }
   return toCsv(rows);
 }
 

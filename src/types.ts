@@ -19,6 +19,10 @@ export interface Proposal {
   showTotalMarkupToCustomer?: boolean;
   /** Customer-facing label for the markup line when visible. */
   totalMarkupLabel?: string;
+  /** When true, sales tax is added on top of the customer total and shown as a line item. */
+  applySalesTax?: boolean;
+  /** Sales tax rate in percent (e.g. 6.5 for Wayne County, OH). */
+  taxRatePct?: number;
   paymentSchedule: PaymentSchedule;
   disclaimers?: string; // markdown
 }

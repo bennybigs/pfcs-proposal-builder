@@ -63,6 +63,12 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
         <div className="space-y-3">
           <div className="section-banner -mx-1 rounded">Project Location</div>
           <Field
+            label="Reference Name"
+            value={proposal.project.referenceName}
+            placeholder="Smith Family Barndominium"
+            onChange={(v) => setProject({ referenceName: v })}
+          />
+          <Field
             label="Street Address"
             value={proposal.project.streetAddress}
             onChange={(v) => setProject({ streetAddress: v })}
@@ -79,15 +85,9 @@ export function CustomerBlock({ proposal }: { proposal: Proposal }) {
           />
         </div>
         <div className="space-y-3">
-          <div className="section-banner -mx-1 rounded">Project</div>
+          <div className="section-banner -mx-1 rounded">Project Manager</div>
           <Field
-            label="Reference Name"
-            value={proposal.project.referenceName}
-            placeholder="Smith Family Barndominium"
-            onChange={(v) => setProject({ referenceName: v })}
-          />
-          <Field
-            label="Sales Rep"
+            label="Project Manager"
             value={proposal.salesRep}
             onChange={(v) => updateProposal(proposal.id, { salesRep: v })}
           />

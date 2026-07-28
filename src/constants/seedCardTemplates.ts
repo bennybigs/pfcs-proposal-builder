@@ -264,6 +264,34 @@ Generator hookup, EV charging, smart-home wiring, and audio/visual pre-wire are 
 - Property taxes, HOA fees, builder's risk insurance during construction`,
   },
   {
+    id: 'oh-tax-exemption',
+    category: 'options',
+    title: 'Ohio Sales Tax Exemption Certificate',
+    defaultContent: `**Sales and Use Tax Unit Exemption Certificate — State of Ohio**
+
+The purchaser hereby claims exception or exemption on the purchase of tangible personal property and selected services made under this certificate from:
+
+**Vendor:** Post-Frame Construction Solutions, LLC
+
+and certifies that the claim is based upon the purchaser's proposed use of the items or services, the activity of the purchaser, or both, as shown hereon:
+
+**Reason for claiming exemption:** [State the statutory reason — e.g., property used directly in agricultural production; purchase by a church or nonprofit organization; direct payment permit holder]
+
+**Purchaser Name:** [Customer / business name]
+
+**Street Address:** [Street address]
+
+**City, State, ZIP:** [City, State ZIP]
+
+**Signature:** ________________________________  **Title:** [Owner / Officer / Member]
+
+**Date Signed:** ______________________
+
+**Vendor's License Number (if any):** [Number, if applicable]
+
+*This section reflects Ohio Department of Taxation form STEC U. The purchaser is responsible for the validity of the exemption claimed; an improperly claimed exemption may make the purchaser liable for the tax, interest, and penalties. The official form is available from the Ohio Department of Taxation (tax.ohio.gov). When this certificate is completed and signed, sales tax will not be charged on this proposal.*`,
+  },
+  {
     id: 'custom',
     category: 'custom',
     title: 'Custom Section',

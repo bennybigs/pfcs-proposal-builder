@@ -2,6 +2,9 @@ import type { Card, Proposal } from '@/types';
 
 export const DEFAULT_MARKUP_LABEL = 'Project Management & Overhead';
 
+/** Combined Ohio state + Wayne County rate — the default when sales tax is switched on. */
+export const DEFAULT_TAX_RATE_PCT = 6.5;
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -47,6 +50,11 @@ export interface ProposalPricing {
   /** Whether the markup renders as its own labeled line for the customer. */
   markupVisible: boolean;
   markupLabel: string;
+  /** Customer total before sales tax. */
+  preTaxTotal: number;
+  taxEnabled: boolean;
+  taxRatePct: number;
+  taxAmount: number;
   /** What the customer pays. */
   total: number;
 }
@@ -61,31 +69,35 @@ export function proposalPricing(proposal: Proposal): ProposalPricing {
     included.reduce((s, c) => s + (cardMarkedPrice(c) as number), 0)
   );
 
+  let preTaxTotal: number;
+  let markupAmount: number;
   if (visible) {
-    const markupAmount = round2((subtotal * pct) / 100);
-    return {
-      baseTotal,
-      subtotal,
-      markupPct: pct,
-      markupAmount,
-      markupVisible: true,
-      markupLabel,
-      total: round2(subtotal + markupAmount),
-    };
+    markupAmount = round2((subtotal * pct) / 100);
+    preTaxTotal = round2(subtotal + markupAmount);
+  } else {
+    // Hidden: pre-tax total = sum of the folded display prices so lines always add up.
+    preTaxTotal = round2(
+      included.reduce((s, c) => s + (cardDisplayPrice(c, proposal) as number), 0)
+    );
+    markupAmount = round2(preTaxTotal - subtotal);
   }
 
-  // Hidden: total = sum of the folded display prices so lines always add up.
-  const total = round2(
-    included.reduce((s, c) => s + (cardDisplayPrice(c, proposal) as number), 0)
-  );
+  const taxEnabled = proposal.applySalesTax ?? false;
+  const taxRatePct = proposal.taxRatePct ?? DEFAULT_TAX_RATE_PCT;
+  const taxAmount = taxEnabled ? round2((preTaxTotal * taxRatePct) / 100) : 0;
+
   return {
     baseTotal,
     subtotal,
     markupPct: pct,
-    markupAmount: round2(total - subtotal),
-    markupVisible: false,
+    markupAmount,
+    markupVisible: visible,
     markupLabel,
-    total,
+    preTaxTotal,
+    taxEnabled,
+    taxRatePct,
+    taxAmount,
+    total: round2(preTaxTotal + taxAmount),
   };
 }
 
