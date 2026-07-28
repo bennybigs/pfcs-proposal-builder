@@ -43,6 +43,8 @@ export function SignatureSection({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          proposalId: proposal.id,
+          appOrigin: window.location.origin,
           proposalNumber: proposal.proposalNumber,
           projectName: proposal.project.referenceName,
           customerName: proposal.customer.fullName,

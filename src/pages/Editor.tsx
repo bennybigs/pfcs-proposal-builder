@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   PointerSensor,
@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { ArrowLeft, MoveLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Check, MoveLeft, Plus, X } from 'lucide-react';
 import type { Card, CardTemplate } from '@/types';
 import { TopBar, type SaveStatus } from '@/components/layout/TopBar';
 import { LibrarySidebar } from '@/components/editor/LibrarySidebar';
@@ -43,6 +43,7 @@ type MobileTab = 'library' | 'proposal' | 'editor';
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const proposal = useProposalStore((s) => (id ? s.proposals[id] : undefined));
   const settings = useLibraryStore((s) => s.settings);
   const addCard = useProposalStore((s) => s.addCard);
@@ -58,6 +59,7 @@ export default function Editor() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [exportCardId, setExportCardId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [signedBanner, setSignedBanner] = useState<string | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const cardPdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -74,6 +76,20 @@ export default function Editor() {
       if (timer) window.clearTimeout(timer);
     };
   }, []);
+
+  // Arriving from the "mark as Contract" button in a signature notification
+  // email: flip the status here, where the proposal data actually lives.
+  useEffect(() => {
+    if (searchParams.get('signed') !== '1' || !id) return;
+    const signer = searchParams.get('by') || 'the customer';
+    updateProposal(id, { status: 'contract' });
+    setSignedBanner(signer);
+    const next = new URLSearchParams(searchParams);
+    next.delete('signed');
+    next.delete('by');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, id]);
 
   // Per-card PDF export: once the hidden single-card document is mounted,
   // print it to a file and clear the request.
@@ -272,6 +288,25 @@ export default function Editor() {
             )}
           >
             <div className="mx-auto max-w-3xl space-y-5 pb-24">
+              {signedBanner && (
+                <div className="flex items-start gap-3 rounded-lg border-2 border-green-600 bg-green-50 p-4">
+                  <Check className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
+                  <div className="text-sm text-green-900">
+                    <div className="font-heading text-base font-bold uppercase tracking-wide">
+                      Signed — moved to Contract
+                    </div>
+                    Electronically signed by <strong>{signedBanner}</strong>. This proposal now
+                    appears under Contracts on the dashboard.
+                  </div>
+                  <button
+                    className="ml-auto text-green-700 hover:text-green-900"
+                    onClick={() => setSignedBanner(null)}
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               <CustomerBlock proposal={proposal} />
 
               <div className="rounded-lg bg-white p-4 shadow-sm">
