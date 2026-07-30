@@ -22,6 +22,20 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Chrome/Edge fire beforeinstallprompt before React mounts, and the event
+      // only fires once — capture it here so the Install button can use it.
+      window.__pfcsInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__pfcsInstallPrompt = e;
+        window.dispatchEvent(new Event('pfcs-installable'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__pfcsInstallPrompt = null;
+        window.dispatchEvent(new Event('pfcs-installed'));
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
