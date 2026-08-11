@@ -23,6 +23,7 @@ import {
 import { useProposalStore } from '@/store/useProposalStore';
 import { grandTotal } from '@/lib/pricing';
 import { STATUS_META } from '@/constants/defaults';
+import { toast } from '@/components/ui/toast';
 import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
 
@@ -53,7 +54,7 @@ export default function Dashboard() {
       const imported = importProposal(parsed);
       navigate(`/proposal/${imported.id}`);
     } catch (err) {
-      alert(`Could not import proposal: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error('Could not import proposal', err instanceof Error ? err.message : String(err));
     }
   };
 

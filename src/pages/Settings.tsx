@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatProposalNumber } from '@/lib/proposalNumber';
 import { MAX_EMBEDDED_LOGO_CHARS } from '@/lib/shareLink';
+import { toast } from '@/components/ui/toast';
 
 /**
  * Downscale an uploaded logo to display size and re-encode it so the data URL
@@ -62,7 +63,7 @@ export default function Settings() {
       const logoUrl = await fileToLogoDataUrl(file);
       updateSettings({ logoUrl });
     } catch (err) {
-      alert(`Could not process logo: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error('Could not process logo', err instanceof Error ? err.message : String(err));
     }
   };
 

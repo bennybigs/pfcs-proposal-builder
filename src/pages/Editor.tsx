@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { toast } from '@/components/ui/toast';
 import { cardFromTemplate, useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
@@ -61,6 +62,7 @@ export default function Editor() {
   const [exportCardId, setExportCardId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [signedBanner, setSignedBanner] = useState<string | null>(null);
+  const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const cardPdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -105,7 +107,7 @@ export default function Editor() {
     const timer = window.setTimeout(() => {
       exportElementToPdf(el, proposal, cardPdfFilename(proposal, card))
         .catch((err) =>
-          alert(`Card PDF export failed: ${err instanceof Error ? err.message : String(err)}`)
+          toast.error('Card PDF export failed', err instanceof Error ? err.message : String(err))
         )
         .finally(() => setExportCardId(null));
     }, 50);
@@ -168,11 +170,13 @@ export default function Editor() {
     const url = buildShareUrl(proposal, settings);
     try {
       await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+      toast.success('Share link copied', 'Paste it into an email or text for your customer.');
     } catch {
-      window.prompt('Copy the share link:', url);
+      // Clipboard blocked (common in some browsers) — show the link in-app to copy by hand.
+      setShareFallbackUrl(url);
     }
-    setShareCopied(true);
-    window.setTimeout(() => setShareCopied(false), 2000);
   };
 
   const handleExportPdf = async () => {
@@ -181,7 +185,7 @@ export default function Editor() {
     try {
       await exportElementToPdf(pdfContainerRef.current, proposal);
     } catch (err) {
-      alert(`PDF export failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error('PDF export failed', err instanceof Error ? err.message : String(err));
     } finally {
       setPdfBusy(false);
     }
@@ -437,6 +441,46 @@ export default function Editor() {
           </aside>
         </div>
       </DndContext>
+
+      {/* Share link fallback — shown only when the browser blocks clipboard access */}
+      <Dialog
+        open={!!shareFallbackUrl}
+        onOpenChange={(open) => !open && setShareFallbackUrl(null)}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogTitle>Copy the share link</DialogTitle>
+          <p className="text-sm text-brand-steel">
+            Your browser blocked automatic copying. Select the link below and copy it
+            (&#8984;C), then send it to your customer.
+          </p>
+          <textarea
+            readOnly
+            rows={4}
+            className="w-full rounded-md border border-input bg-brand-gray-bg p-2 font-mono text-xs"
+            value={shareFallbackUrl ?? ''}
+            onFocus={(e) => e.currentTarget.select()}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShareFallbackUrl(null)}>
+              Close
+            </Button>
+            <Button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareFallbackUrl ?? '');
+                  toast.success('Share link copied');
+                  setShareFallbackUrl(null);
+                } catch {
+                  toast.error('Still blocked', 'Select the text above and press ⌘C.');
+                }
+              }}
+            >
+              Try copying again
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Customer-view preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

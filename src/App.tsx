@@ -4,6 +4,7 @@ import Editor from '@/pages/Editor';
 import CustomerView from '@/pages/CustomerView';
 import LibraryEditor from '@/pages/LibraryEditor';
 import Settings from '@/pages/Settings';
+import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
   );
 }
