@@ -48,3 +48,20 @@ Setup that should already be true: Supabase project live, schema applied, your e
    marked won), and "Win rate (12 mo)" = won ÷ (won + lost).
 8. Segment chips at top-right filter the whole board.
 9. At 390px width the columns scroll horizontally and snap; the strip scrolls too.
+
+## Phase 3 — Tasks & follow-ups
+
+1. `/crm/tasks`: quick-add row — type a title, pick a date and a contact, Add (or press
+   Enter). It lands in the right section: Overdue / Today / Next 7 days / Later.
+2. **Mine / Everyone** toggle filters by who the task is assigned to (tasks you create are
+   assigned to your email automatically).
+3. The task also appears on its contact's timeline.
+4. Tap the circle to complete → green check, it moves to "Recently done", and the contact's
+   timeline gains "Task completed: …". Tapping again reopens it.
+5. Gone quiet (built with the pipeline, verified here): take a deal in an open stage with no
+   open task, whose last activity and stage change are older than 14 days → its pipeline
+   card shows an amber **gone quiet** badge and the dashboard strip counts it. Logging any
+   activity or adding a task clears the badge.
+   (To simulate without waiting 14 days: in Supabase SQL editor,
+   `update deals set stage_entered_at = now() - interval '20 days' where id = '…';`
+   and ensure its activities are older or absent.)
