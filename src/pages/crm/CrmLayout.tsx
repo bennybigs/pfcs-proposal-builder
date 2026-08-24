@@ -4,7 +4,8 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from '@/components/layout/AppHeader';
-import { AuthGate } from '@/components/crm/AuthGate';
+import { AuthGate, useSessionEmail } from '@/components/crm/AuthGate';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 const SUBNAV = [
@@ -29,6 +30,7 @@ export default function CrmLayout() {
           <AppHeader />
           <div className="border-b bg-white">
             <nav className="mx-auto flex max-w-6xl items-center gap-1 px-4 py-2">
+              <SessionBadge />
               {SUBNAV.map((item) => {
                 const active =
                   item.to === '/crm'
@@ -57,5 +59,24 @@ export default function CrmLayout() {
         </div>
       </AuthGate>
     </QueryClientProvider>
+  );
+}
+
+/** Who am I + one-tap sign out — lives at the right edge of the CRM sub-nav. */
+function SessionBadge() {
+  const email = useSessionEmail();
+  return (
+    <span className="order-last ml-auto flex items-center gap-2 text-xs text-brand-steel">
+      <span className="hidden max-w-48 truncate sm:inline" title={email}>{email}</span>
+      <button
+        className="rounded-md border px-2 py-1 font-medium hover:bg-brand-gray-bg"
+        onClick={async () => {
+          await supabase?.auth.signOut();
+          window.location.assign('/crm');
+        }}
+      >
+        Sign out
+      </button>
+    </span>
   );
 }

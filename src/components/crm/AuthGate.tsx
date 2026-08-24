@@ -25,7 +25,20 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    // getSession alone trusts localStorage; getUser round-trips to the server.
+    // A stale/revoked session (the "looks signed in but nothing works" state)
+    // gets cleared here so the sign-in card appears instead of a zombie UI.
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) {
+        const { error } = await supabase!.auth.getUser();
+        if (error) {
+          await supabase!.auth.signOut();
+          setSession(null);
+          return;
+        }
+      }
+      setSession(data.session);
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
