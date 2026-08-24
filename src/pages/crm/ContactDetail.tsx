@@ -76,7 +76,7 @@ export default function ContactDetail() {
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals]);
   const { data: proposalLinks = [] } = useDealProposalLinks(dealIds);
   const { create: createDeal } = useDealMutations();
-  const { remove: removeContact } = useContactMutations();
+  const { remove: removeContact, update: updateContact } = useContactMutations();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -185,13 +185,25 @@ export default function ContactDetail() {
           <Button size="sm" onClick={newDeal} disabled={createDeal.isPending}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> New deal
           </Button>
-          <Button variant="outline" size="sm" title="Delete this contact"
+          <Button variant="outline" size="sm" title="Archive or delete this contact"
             className="text-brand-steel hover:text-red-600"
             onClick={() => setDeleteOpen(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
         {contact.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-brand-steel">{contact.notes}</p>}
+        {contact.archived && (
+          <div className="mt-3 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span className="font-medium">Archived</span> — hidden from the contact list and pipeline.
+            <Button size="sm" variant="outline" className="ml-auto"
+              onClick={async () => {
+                await updateContact.mutateAsync({ id: contact.id, patch: { archived: false } });
+                toast.success('Restored', `${contact.name} is back on the working list.`);
+              }}>
+              Restore
+            </Button>
+          </div>
+        )}
       </div>
 
       {deals.length > 0 && (
@@ -271,21 +283,39 @@ export default function ContactDetail() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete {contact.name}?</DialogTitle>
+            <DialogTitle>{contact.archived ? `Delete ${contact.name}?` : `Archive or delete ${contact.name}?`}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-brand-steel">
-            This permanently deletes the contact
-            {deals.length > 0 && <> and their <b>{deals.length} deal{deals.length > 1 ? 's' : ''}</b></>}
-            , plus the whole timeline (calls, notes, tasks) — for everyone on the team.
-            Proposal documents themselves are not deleted.
-          </p>
-          <p className="text-sm text-brand-steel">
-            If they're just not a prospect anymore, marking their deal <b>Lost</b> keeps the
-            history instead.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button
+          {!contact.archived && (
+            <div className="rounded-md border p-3">
+              <div className="text-sm font-medium text-brand-black">Archive (recommended)</div>
+              <p className="mt-0.5 text-sm text-brand-steel">
+                Hides them from the contact list and pipeline. Every call, deal, and proposal
+                stays — restore anytime from the &quot;Archived&quot; filter.
+              </p>
+              <Button className="mt-2 w-full"
+                onClick={async () => {
+                  setDeleteOpen(false);
+                  try {
+                    await updateContact.mutateAsync({ id: contact.id, patch: { archived: true } });
+                    toast.success('Archived', `${contact.name} is tucked away — restore anytime.`);
+                    navigate('/crm');
+                  } catch (err) {
+                    toast.error('Could not archive', err instanceof Error ? err.message : String(err));
+                  }
+                }}>
+                Archive contact
+              </Button>
+            </div>
+          )}
+          <div className="rounded-md border p-3">
+            <div className="text-sm font-medium text-brand-black">Delete forever</div>
+            <p className="mt-0.5 text-sm text-brand-steel">
+              Permanently deletes the contact
+              {deals.length > 0 && <> and their <b>{deals.length} deal{deals.length > 1 ? 's' : ''}</b></>}
+              , plus the whole timeline (calls, notes, tasks) — for everyone on the team.
+              Proposal documents themselves are not deleted.
+            </p>
+            <Button variant="outline" className="mt-2 w-full text-red-600 hover:bg-red-50"
               onClick={async () => {
                 setDeleteOpen(false);
                 try {
@@ -295,10 +325,12 @@ export default function ContactDetail() {
                 } catch (err) {
                   toast.error('Could not delete', err instanceof Error ? err.message : String(err));
                 }
-              }}
-            >
-              Delete contact
+              }}>
+              Delete forever
             </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

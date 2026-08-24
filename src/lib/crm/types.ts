@@ -28,6 +28,7 @@ export interface Contact {
   source: ContactSource;
   tags: string[];
   notes: string;
+  archived: boolean;
   created_at: string;
   updated_at: string;
   owner: string | null;

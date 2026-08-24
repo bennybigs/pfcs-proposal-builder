@@ -21,6 +21,7 @@ export default function Contacts() {
   const [tag, setTag] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query.trim().toLowerCase()), 200);
@@ -32,9 +33,11 @@ export default function Contacts() {
     [contacts]
   );
 
+  const archivedCount = useMemo(() => contacts.filter((c) => c.archived).length, [contacts]);
   const filtered = useMemo(
     () =>
       contacts.filter((c) => {
+        if (!!c.archived !== showArchived) return false;
         if (source && c.source !== source) return false;
         if (tag && !c.tags.includes(tag)) return false;
         if (!debounced) return true;
@@ -43,7 +46,7 @@ export default function Contacts() {
           .toLowerCase()
           .includes(debounced);
       }),
-    [contacts, debounced, source, tag]
+    [contacts, debounced, source, tag, showArchived]
   );
 
   const exportCsv = () => {
@@ -103,7 +106,21 @@ export default function Contacts() {
             #{t}
           </Chip>
         ))}
+        {archivedCount > 0 && (
+          <>
+            <span className="mx-1 text-brand-steel">·</span>
+            <Chip active={showArchived} onClick={() => setShowArchived(!showArchived)}>
+              Archived ({archivedCount})
+            </Chip>
+          </>
+        )}
       </div>
+      {showArchived && (
+        <p className="mt-2 text-xs text-brand-steel">
+          Archived contacts — hidden from the working list, everything kept. Open one to
+          restore it.
+        </p>
+      )}
 
       {error ? (
         <p className="mt-8 text-sm text-red-600">Could not load contacts: {String(error)}</p>
@@ -113,7 +130,9 @@ export default function Contacts() {
         <p className="mt-8 text-sm text-brand-steel">
           {contacts.length === 0
             ? 'No contacts yet — add your first, or import a CSV.'
-            : 'No matches.'}
+            : showArchived
+              ? 'Nothing archived matches.'
+              : 'No matches.'}
         </p>
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border bg-white shadow-sm">

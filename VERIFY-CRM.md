@@ -109,3 +109,14 @@ Setup that should already be true: Supabase project live, schema applied, your e
 3. Wrong password → clear error; creating an account for an already-registered email →
    pointed to Sign in.
 4. An account whose email is NOT on the team list still sees "Not on the team" and no data.
+
+## Archive contacts
+
+1. On a contact page, the trash button now offers two exits: **Archive (recommended)** and
+   **Delete forever** (each explains its consequences; Cancel backs out).
+2. Archiving hides the contact from the working list and takes their deals off the pipeline
+   board and out of the dashboard numbers. Nothing is deleted.
+3. The contact list shows an **Archived (n)** chip once anything is archived — click it to
+   see the archived set; open one and hit **Restore** on the amber banner to bring them
+   (and their deals) right back.
+4. An already-archived contact's trash button offers only Delete forever.

@@ -47,6 +47,7 @@ create table if not exists public.contacts (
   source       contact_source not null default 'other',
   tags         text[] not null default '{}',
   notes        text not null default '',
+  archived     boolean not null default false,          -- hidden, not gone
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   owner        uuid references auth.users (id) on delete set null
@@ -102,6 +103,9 @@ create table if not exists public.proposal_links (
   linked_by   text not null default '',
   unique (deal_id, proposal_id)
 );
+
+-- migration for databases created before the archived column existed
+alter table public.contacts add column if not exists archived boolean not null default false;
 
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (

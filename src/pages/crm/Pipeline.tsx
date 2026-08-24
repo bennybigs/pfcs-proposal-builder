@@ -57,11 +57,16 @@ export default function Pipeline() {
   const [segment, setSegment] = useState<DealSegment | null>(null);
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
-  const quiet = useMemo(() => goneQuietDealIds(deals, activities, tasks), [deals, activities, tasks]);
+  // archived contacts take their deals off the board and out of the numbers
+  const activeDeals = useMemo(
+    () => deals.filter((d) => !contactById.get(d.contact_id)?.archived),
+    [deals, contactById]
+  );
+  const quiet = useMemo(() => goneQuietDealIds(activeDeals, activities, tasks), [activeDeals, activities, tasks]);
 
   const visible = useMemo(
-    () => (segment ? deals.filter((d) => d.segment === segment) : deals),
-    [deals, segment]
+    () => (segment ? activeDeals.filter((d) => d.segment === segment) : activeDeals),
+    [activeDeals, segment]
   );
   const byStage = useMemo(() => {
     const m = new Map<DealStage, Deal[]>(STAGES.map((s) => [s, []]));
@@ -82,16 +87,16 @@ export default function Pipeline() {
       total: (byStage.get(s) ?? []).reduce((n, d) => n + d.value, 0),
       count: (byStage.get(s) ?? []).length,
     }));
-    const wonThisMonth = deals
+    const wonThisMonth = activeDeals
       .filter((d) => d.stage === 'won' && new Date(d.stage_entered_at) >= monthStart)
       .reduce((n, d) => n + d.value, 0);
-    const closed12 = deals.filter(
+    const closed12 = activeDeals.filter(
       (d) => (d.stage === 'won' || d.stage === 'lost') && new Date(d.stage_entered_at) >= yearAgo
     );
     const won12 = closed12.filter((d) => d.stage === 'won').length;
     const winRate = closed12.length ? Math.round((won12 / closed12.length) * 100) : null;
     return { openByStage, wonThisMonth, winRate, quietCount: quiet.size };
-  }, [deals, byStage, quiet]);
+  }, [activeDeals, byStage, quiet]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
