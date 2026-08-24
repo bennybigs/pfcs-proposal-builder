@@ -198,6 +198,14 @@ function SignIn() {
                   Create account
                 </Button>
               </div>
+              <Button variant="outline" className="w-full" onClick={sendLink} disabled={busy || !emailOk}>
+                {busy ? '…' : 'No password? Email me a sign-in link'}
+              </Button>
+              {sent && (
+                <p className="text-sm text-brand-steel">
+                  Sent — check your email and open the link on this device.
+                </p>
+              )}
             </>
           )}
           {mode === 'link' &&
