@@ -28,6 +28,9 @@ export interface Proposal {
   taxRatePct?: number;
   paymentSchedule: PaymentSchedule;
   disclaimers?: string; // markdown
+  /** Optional CRM linkage (contact + deal ids in Supabase). Absent on
+   *  proposals that never touched the CRM — fully backward-compatible. */
+  crm?: { contactId: string; dealId: string };
 }
 
 export interface CustomerInfo {

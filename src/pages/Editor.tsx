@@ -32,6 +32,8 @@ import { cardFromTemplate, useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
 import { cardPdfFilename, exportElementToPdf } from '@/lib/pdfExport';
+import { logProposalEvent } from '@/lib/crm/integration/proposalEvents';
+import { CrmLinkControl } from '@/components/crm/CrmLinkControl';
 import {
   downloadTextFile,
   generateCustomerCsv,
@@ -166,6 +168,15 @@ export default function Editor() {
     }
   };
 
+  // Sharing counts as "sent": auto-log to the CRM when linked, and nudge the
+  // proposal's own status forward the first time.
+  // DECISION: status only auto-advances from 'draft' → 'sent' — later manual
+  // statuses (accepted/contract) are never overwritten by re-sharing.
+  const afterSent = (kind: 'share' | 'pdf', url?: string) => {
+    if (proposal.status === 'draft') updateProposal(proposal.id, { status: 'sent' });
+    logProposalEvent(proposal, kind, url);
+  };
+
   const handleShare = async () => {
     const url = buildShareUrl(proposal, settings);
     try {
@@ -177,6 +188,7 @@ export default function Editor() {
       // Clipboard blocked (common in some browsers) — show the link in-app to copy by hand.
       setShareFallbackUrl(url);
     }
+    afterSent('share', url);
   };
 
   const handleExportPdf = async () => {
@@ -184,6 +196,7 @@ export default function Editor() {
     setPdfBusy(true);
     try {
       await exportElementToPdf(pdfContainerRef.current, proposal);
+      afterSent('pdf');
     } catch (err) {
       toast.error('PDF export failed', err instanceof Error ? err.message : String(err));
     } finally {
@@ -207,6 +220,7 @@ export default function Editor() {
       settings.companyName,
     ].join('\n');
     window.location.href = `mailto:${encodeURIComponent(proposal.customer.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    afterSent('share', url);
   };
 
   const handleExportJson = () => {
@@ -226,6 +240,7 @@ export default function Editor() {
         saveStatus={saveStatus}
         onPreview={() => setPreviewOpen(true)}
         onShare={handleShare}
+        crmControl={<CrmLinkControl proposal={proposal} />}
         shareCopied={shareCopied}
         onExportPdf={handleExportPdf}
         pdfBusy={pdfBusy}

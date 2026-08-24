@@ -56,6 +56,7 @@ export function TopBar({
   onExportJson,
   onSend,
   onDelete,
+  crmControl,
 }: {
   proposal: Proposal;
   saveStatus: SaveStatus;
@@ -69,6 +70,7 @@ export function TopBar({
   onExportJson: () => void;
   onSend: () => void;
   onDelete: () => void;
+  crmControl?: React.ReactNode;
 }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
   const logoUrl = useLibraryStore((s) => s.settings.logoUrl);
@@ -126,6 +128,7 @@ export function TopBar({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {crmControl}
           <Button variant="outline" size="sm" onClick={onPreview}>
             <Eye className="h-4 w-4" />
             <span className="hidden lg:inline">Preview</span>

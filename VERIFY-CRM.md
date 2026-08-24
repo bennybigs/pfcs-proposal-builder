@@ -65,3 +65,27 @@ Setup that should already be true: Supabase project live, schema applied, your e
    (To simulate without waiting 14 days: in Supabase SQL editor,
    `update deals set stage_entered_at = now() - interval '20 days' where id = '…';`
    and ensure its activities are older or absent.)
+
+## Phase 4 — Proposal builder integration
+
+1. On a contact (or in a deal drawer): **New proposal** → the editor opens with the
+   customer block prefilled from the contact and the project name set from the deal.
+   With no open deal, one is auto-created at Inquiry ("{name} — new project"); with
+   several open deals, a picker asks which.
+2. The editor header shows the CRM link state: a linked proposal shows the contact's
+   name (click = Unlink); an unlinked one shows **Link to CRM** → search contacts or
+   "Create contact from this proposal", then pick or create a deal.
+3. With a linked proposal, click **Share Link** (or export the PDF): the share still
+   works exactly as before, plus a toast "Logged to CRM", the contact's timeline gains
+   "Proposal sent — $X (share link/PDF)", and a deal at Inquiry/Site Visit auto-advances
+   to Proposal Sent. Signed out of the CRM? You get "Not logged to CRM" and sharing is
+   unaffected.
+4. Deal drawer → Proposals section: linked proposals show title + snapshot total, an
+   **Open** button (works on any teammate's device via the stored share URL), **Use this
+   total** (sets the deal value + logs it), and — when the proposal lives in this
+   browser — **Refresh from proposal** for the live computed total.
+5. The contact page's Proposals section lists the same links.
+6. First share of a draft proposal flips its own status to "sent" (later statuses are
+   never overwritten by re-sharing).
+7. QuickBooks export unchanged. A browser that never opens /crm sees the proposal
+   builder exactly as before.

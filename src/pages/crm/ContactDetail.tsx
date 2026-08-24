@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/toast';
 import { ContactDialog } from '@/components/crm/ContactDialog';
+import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useContact } from '@/lib/crm/api/contacts';
 import { useContactActivities, useLogActivity } from '@/lib/crm/api/activities';
 import { useContactDeals, useDealMutations } from '@/lib/crm/api/deals';
@@ -170,6 +171,7 @@ export default function ContactDetail() {
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>
+          <NewProposalButton contact={contact} />
           <Button size="sm" onClick={newDeal} disabled={createDeal.isPending}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> New deal
           </Button>

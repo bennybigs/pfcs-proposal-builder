@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { useDealMutations } from '@/lib/crm/api/deals';
+import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useDealProposalLinks } from '@/lib/crm/api/proposalLinks';
 import { useLogActivity } from '@/lib/crm/api/activities';
 import { useProposalStore } from '@/store/useProposalStore';
@@ -223,7 +224,10 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
         </div>
 
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-brand-black">Proposals</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-brand-black">Proposals</h3>
+            {contact && <NewProposalButton contact={contact} deal={deal} />}
+          </div>
           {links.length === 0 ? (
             <p className="mt-1 text-xs text-brand-steel">
               None linked yet — start one from the contact page, or use “Link to CRM” inside a
