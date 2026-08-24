@@ -98,3 +98,14 @@ Setup that should already be true: Supabase project live, schema applied, your e
 3. Remove (trash icon) asks first, then cuts their access immediately; everything they
    logged stays.
 4. Guard rails: you can't remove yourself, so the team list can never become empty.
+
+## Password sign-in (no-email path)
+
+1. `/crm` signed out: the card now asks for email + password with **Sign in** and
+   **Create account** buttons; "Prefer an emailed sign-in link?" switches to the old flow.
+2. New teammate flow, zero email dependency: add their email on `/crm/team`, text them the
+   link; they enter that email, pick a password (8+ chars), tap Create account → in
+   immediately.
+3. Wrong password → clear error; creating an account for an already-registered email →
+   pointed to Sign in.
+4. An account whose email is NOT on the team list still sees "Not on the team" and no data.

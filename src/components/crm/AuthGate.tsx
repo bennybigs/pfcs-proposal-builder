@@ -85,13 +85,56 @@ function Shell({ children }: { children?: React.ReactNode }) {
   );
 }
 
+// Password-first sign-in: accounts activate instantly (auth autoconfirm is
+// on), so joining the team never waits on an email being delivered. The
+// magic-link path stays as a fallback. Access is still gated by team_members
+// either way — an account alone sees nothing.
 function SignIn() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'password' | 'link'>('password');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const send = async () => {
+  const emailOk = email.includes('@');
+
+  const signIn = async () => {
+    setBusy(true);
+    setError('');
+    const { error: err } = await supabase!.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setBusy(false);
+    if (err) {
+      setError(
+        /invalid login credentials/i.test(err.message)
+          ? 'No account with that email + password. New here? Use "Create account".'
+          : err.message
+      );
+    }
+    // success: onAuthStateChange takes over
+  };
+
+  const createAccount = async () => {
+    setBusy(true);
+    setError('');
+    const { error: err } = await supabase!.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+    setBusy(false);
+    if (err) {
+      setError(
+        /already registered/i.test(err.message)
+          ? 'That email already has an account — use "Sign in" with its password.'
+          : err.message
+      );
+    }
+  };
+
+  const sendLink = async () => {
     setBusy(true);
     setError('');
     const { error: err } = await supabase!.auth.signInWithOtp({
@@ -107,30 +150,66 @@ function SignIn() {
     <Shell>
       <div className="mx-auto max-w-sm rounded-lg border bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-brand-black">PFCS CRM</h2>
-        {sent ? (
-          <p className="mt-2 text-sm text-brand-steel">
-            Check your email — we sent a sign-in link to <b>{email}</b>. Open it on this device.
-          </p>
-        ) : (
-          <>
-            <p className="mt-1 text-sm text-brand-steel">
-              Enter your work email and we&apos;ll send you a sign-in link. No password.
-            </p>
-            <div className="mt-4 flex gap-2">
+        <p className="mt-1 text-sm text-brand-steel">
+          Team sign-in. First time? Enter your email, pick a password, and hit
+          &quot;Create account&quot; — you&apos;re in immediately.
+        </p>
+        <div className="mt-4 grid gap-2">
+          <Input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          {mode === 'password' && (
+            <>
               <Input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && email.includes('@') && send()}
+                type="password"
+                placeholder="Password (8+ characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                onKeyDown={(e) => e.key === 'Enter' && emailOk && password.length >= 8 && signIn()}
               />
-              <Button onClick={send} disabled={busy || !email.includes('@')}>
-                {busy ? '…' : 'Send link'}
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={signIn} disabled={busy || !emailOk || password.length < 8}>
+                  {busy ? '…' : 'Sign in'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={createAccount}
+                  disabled={busy || !emailOk || password.length < 8}
+                >
+                  Create account
+                </Button>
+              </div>
+            </>
+          )}
+          {mode === 'link' &&
+            (sent ? (
+              <p className="text-sm text-brand-steel">
+                Check your email — we sent a sign-in link to <b>{email}</b>. Open it on this
+                device.
+              </p>
+            ) : (
+              <Button onClick={sendLink} disabled={busy || !emailOk}>
+                {busy ? '…' : 'Email me a sign-in link'}
               </Button>
-            </div>
-            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-          </>
-        )}
+            ))}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button
+            className="mt-1 text-left text-xs text-brand-steel underline-offset-2 hover:underline"
+            onClick={() => {
+              setMode(mode === 'password' ? 'link' : 'password');
+              setError('');
+              setSent(false);
+            }}
+          >
+            {mode === 'password' ? 'Prefer an emailed sign-in link?' : 'Use a password instead'}
+          </button>
+        </div>
       </div>
     </Shell>
   );

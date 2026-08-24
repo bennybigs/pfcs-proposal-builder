@@ -31,7 +31,7 @@ export default function Team() {
       await add.mutateAsync({ email, name });
       toast.success(
         'Teammate added',
-        `Send them ${window.location.origin}/crm — they sign in with their email, no password.`
+        `Send them ${window.location.origin}/crm — they enter this email, pick a password, and they're in.`
       );
       setEmail('');
       setName('');
@@ -44,9 +44,10 @@ export default function Team() {
     <div className="mx-auto max-w-xl">
       <h1 className="text-xl font-bold text-brand-black">Team</h1>
       <p className="mt-1 text-sm text-brand-steel">
-        Everyone listed here can use the CRM. Add an email, then text or email them the link
-        — <b>{window.location.origin}/crm</b> — and they sign themselves in. Nobody else can
-        see anything, even if they find the link.
+        Everyone listed here can use the CRM. Add an email, then text them the link —{' '}
+        <b>{window.location.origin}/crm</b> — where they enter that email, pick a password,
+        and tap &quot;Create account&quot;. They&apos;re in immediately; no waiting on any
+        email. Nobody else can see anything, even if they find the link.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm">
