@@ -16,14 +16,22 @@ import {
   Phone,
   Plus,
   StickyNote,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { ContactDialog } from '@/components/crm/ContactDialog';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
-import { useContact } from '@/lib/crm/api/contacts';
+import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
 import { useContactActivities, useLogActivity } from '@/lib/crm/api/activities';
 import { useContactDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTasks, useTaskMutations } from '@/lib/crm/api/tasks';
@@ -68,7 +76,9 @@ export default function ContactDetail() {
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals]);
   const { data: proposalLinks = [] } = useDealProposalLinks(dealIds);
   const { create: createDeal } = useDealMutations();
+  const { remove: removeContact } = useContactMutations();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const tasks = useMemo(
     () =>
@@ -175,6 +185,11 @@ export default function ContactDetail() {
           <Button size="sm" onClick={newDeal} disabled={createDeal.isPending}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> New deal
           </Button>
+          <Button variant="outline" size="sm" title="Delete this contact"
+            className="text-brand-steel hover:text-red-600"
+            onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
         {contact.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-brand-steel">{contact.notes}</p>}
       </div>
@@ -253,6 +268,40 @@ export default function ContactDetail() {
 
       <QuickLogBar contactId={contact.id} />
       <ContactDialog open={editOpen} onOpenChange={setEditOpen} contact={contact} />
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {contact.name}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-brand-steel">
+            This permanently deletes the contact
+            {deals.length > 0 && <> and their <b>{deals.length} deal{deals.length > 1 ? 's' : ''}</b></>}
+            , plus the whole timeline (calls, notes, tasks) — for everyone on the team.
+            Proposal documents themselves are not deleted.
+          </p>
+          <p className="text-sm text-brand-steel">
+            If they're just not a prospect anymore, marking their deal <b>Lost</b> keeps the
+            history instead.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                setDeleteOpen(false);
+                try {
+                  await removeContact.mutateAsync(contact.id);
+                  toast.success('Contact deleted');
+                  navigate('/crm');
+                } catch (err) {
+                  toast.error('Could not delete', err instanceof Error ? err.message : String(err));
+                }
+              }}
+            >
+              Delete contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
