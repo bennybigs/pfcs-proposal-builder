@@ -9,6 +9,7 @@ import Contacts from '@/pages/crm/Contacts';
 import ContactDetail from '@/pages/crm/ContactDetail';
 import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
+import Team from '@/pages/crm/Team';
 import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="contacts/:id" element={<ContactDetail />} />
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="team" element={<Team />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

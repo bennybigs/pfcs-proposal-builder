@@ -14,13 +14,13 @@ Supabase project. The proposal builder itself still works entirely without it.
    Ohio, e.g. `us-east-2`). Wait for it to provision.
 2. **Apply the schema** — SQL Editor → New query → paste all of `schema.sql` → Run.
    It's idempotent; re-running is safe.
-3. **Add your team** — SQL Editor:
+3. **Add yourself** — SQL Editor (only the FIRST member needs SQL; after that, the
+   app's /crm/team page manages the list):
    ```sql
-   insert into public.team_members (email, display_name) values
-     ('ben@mcsi.work', 'Ben'),
-     ('teammate@example.com', 'Teammate');
+   insert into public.team_members (email, display_name) values ('ben@mcsi.work', 'Ben');
    ```
    This table is the real access gate: signing in without being listed gets you nothing.
+   Guard rail: the app can never delete your own row, so the team can't be emptied.
 4. **Auth redirects** — Authentication → URL Configuration:
    - Site URL: `https://pfcs-proposal-builder.vercel.app`
    - Redirect URLs: add `https://pfcs-proposal-builder.vercel.app/crm` and

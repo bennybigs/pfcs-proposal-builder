@@ -11,6 +11,7 @@ const SUBNAV = [
   { to: '/crm', label: 'Contacts' },
   { to: '/crm/pipeline', label: 'Pipeline' },
   { to: '/crm/tasks', label: 'Tasks' },
+  { to: '/crm/team', label: 'Team' },
 ];
 
 // One client for the CRM's server cache. Zustand remains the UI state store —

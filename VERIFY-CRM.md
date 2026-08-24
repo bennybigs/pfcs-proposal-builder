@@ -89,3 +89,12 @@ Setup that should already be true: Supabase project live, schema applied, your e
    never overwritten by re-sharing).
 7. QuickBooks export unchanged. A browser that never opens /crm sees the proposal
    builder exactly as before.
+
+## Team page (post-brief addition)
+
+1. `/crm/team`: your row shows "(you)" with no remove button.
+2. Type a teammate's email → Add → toast tells you to send them the /crm link. They sign
+   in themselves with a magic link — nothing else needed from you.
+3. Remove (trash icon) asks first, then cuts their access immediately; everything they
+   logged stays.
+4. Guard rails: you can't remove yourself, so the team list can never become empty.

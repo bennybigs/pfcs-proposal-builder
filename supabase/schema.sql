@@ -146,11 +146,24 @@ alter table public.tasks          enable row level security;
 alter table public.proposal_links enable row level security;
 alter table public.heartbeat      enable row level security;
 
--- team_members: readable by the team (so the UI can show names); writes are
--- owner-only via the dashboard/SQL or service role — no client policy.
+-- team_members: readable AND manageable by the team from the app's Team
+-- page. The one guard rail: you can never delete YOURSELF — so the list can
+-- never be emptied and nobody can lock the whole team out.
 drop policy if exists "team read" on public.team_members;
 create policy "team read" on public.team_members
   for select using (public.is_team_member());
+
+drop policy if exists "team add" on public.team_members;
+create policy "team add" on public.team_members
+  for insert with check (public.is_team_member());
+
+drop policy if exists "team rename" on public.team_members;
+create policy "team rename" on public.team_members
+  for update using (public.is_team_member()) with check (public.is_team_member());
+
+drop policy if exists "team remove others" on public.team_members;
+create policy "team remove others" on public.team_members
+  for delete using (public.is_team_member() and email <> auth.email());
 
 do $$
 declare t text;
