@@ -2,7 +2,7 @@
 // them the /crm link, and they sign themselves in with a magic link. RLS
 // guard rail: nobody can remove their own row, so the list can't be emptied.
 import { useState } from 'react';
-import { Trash2, UserPlus } from 'lucide-react';
+import { KeyRound, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { useSessionEmail } from '@/components/crm/AuthGate';
+import { supabase } from '@/lib/supabase';
 import { useTeam, useTeamMutations, type TeamMember } from '@/lib/crm/api/team';
 import { formatDateUS } from '@/lib/format';
 
@@ -24,6 +25,36 @@ export default function Team() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
+  const [passwordFor, setPasswordFor] = useState<TeamMember | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+
+  const setPassword = async () => {
+    if (!passwordFor || newPassword.length < 8) return;
+    setPasswordBusy(true);
+    try {
+      const token = (await supabase!.auth.getSession()).data.session?.access_token;
+      const r = await fetch('/api/team-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetEmail: passwordFor.email, newPassword }),
+      });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+      toast.success(
+        'Password set',
+        passwordFor.email === myEmail
+          ? 'Use it to sign in on your phone.'
+          : `Text it to ${passwordFor.display_name || passwordFor.email} — they sign straight in, no account setup.`
+      );
+      setPasswordFor(null);
+      setNewPassword('');
+    } catch (err) {
+      toast.error('Could not set password', err instanceof Error ? err.message : String(err));
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!email.includes('@')) return;
@@ -85,6 +116,13 @@ export default function Team() {
                 {m.display_name && <div className="text-xs text-brand-steel">{m.email}</div>}
               </div>
               <span className="shrink-0 text-xs text-brand-steel">added {formatDateUS(m.added_at)}</span>
+              <button
+                onClick={() => { setPasswordFor(m); setNewPassword(''); }}
+                className="shrink-0 text-brand-steel/60 hover:text-brand-orange"
+                title="Set or reset this person's password"
+              >
+                <KeyRound className="h-4 w-4" />
+              </button>
               {m.email !== myEmail && (
                 <button
                   onClick={() => setConfirmRemove(m)}
@@ -98,6 +136,36 @@ export default function Team() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!passwordFor} onOpenChange={(o) => !o && setPasswordFor(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Set password — {passwordFor?.display_name || passwordFor?.email}
+              {passwordFor?.email === myEmail ? ' (you)' : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-brand-steel">
+            {passwordFor?.email === myEmail
+              ? 'Pick a password for your own sign-in (phone, laptop, anywhere).'
+              : 'Pick a starter password and text it to them with the link. It works immediately — even if they never created an account. They (or you) can change it here anytime.'}
+          </p>
+          <Input
+            type="text"
+            autoFocus
+            placeholder="Password (8+ characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === 'Return') && setPassword()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordFor(null)}>Cancel</Button>
+            <Button onClick={setPassword} disabled={newPassword.length < 8 || passwordBusy}>
+              {passwordBusy ? '…' : 'Set password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
         <DialogContent className="sm:max-w-sm">

@@ -120,3 +120,13 @@ Setup that should already be true: Supabase project live, schema applied, your e
    see the archived set; open one and hit **Restore** on the amber banner to bring them
    (and their deals) right back.
 4. An already-archived contact's trash button offers only Delete forever.
+
+## Team passwords
+
+1. `/crm/team`: every row has a key icon — including your own. Click it, type a password
+   (8+ chars, shown in clear so you can read it out or text it), Set password.
+2. Setting your own: sign out (or grab your phone), sign in with email + that password.
+3. Setting a teammate's works even before they've ever signed in — the account is created
+   on the spot, so they skip "Create account" and just sign in with what you texted.
+4. Guard rails: only signed-in team members can call it, and only for emails on the team
+   list (the API refuses anything else).
