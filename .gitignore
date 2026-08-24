@@ -4,3 +4,7 @@ dist-ssr
 *.local
 .DS_Store
 .vercel
+
+# env — never commit real keys
+.env.local
+.env*.local

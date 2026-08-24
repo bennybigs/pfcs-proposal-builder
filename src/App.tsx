@@ -4,6 +4,11 @@ import Editor from '@/pages/Editor';
 import CustomerView from '@/pages/CustomerView';
 import LibraryEditor from '@/pages/LibraryEditor';
 import Settings from '@/pages/Settings';
+import CrmLayout from '@/pages/crm/CrmLayout';
+import Contacts from '@/pages/crm/Contacts';
+import ContactDetail from '@/pages/crm/ContactDetail';
+import Pipeline from '@/pages/crm/Pipeline';
+import Tasks from '@/pages/crm/Tasks';
 import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
@@ -15,6 +20,12 @@ export default function App() {
         <Route path="/view" element={<CustomerView />} />
         <Route path="/library" element={<LibraryEditor />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/crm" element={<CrmLayout />}>
+          <Route index element={<Contacts />} />
+          <Route path="contacts/:id" element={<ContactDetail />} />
+          <Route path="pipeline" element={<Pipeline />} />
+          <Route path="tasks" element={<Tasks />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />

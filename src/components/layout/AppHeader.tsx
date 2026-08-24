@@ -5,6 +5,7 @@ import { InstallAppButton } from '@/components/layout/InstallAppButton';
 
 const NAV = [
   { to: '/', label: 'Proposals' },
+  { to: '/crm', label: 'CRM' },
   { to: '/library', label: 'Card Library' },
   { to: '/settings', label: 'Settings' },
 ];
@@ -27,7 +28,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
                 to={item.to}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  pathname === item.to
+                  (item.to === '/crm' ? pathname.startsWith('/crm') : pathname === item.to)
                     ? 'bg-brand-orange/10 text-brand-orange'
                     : 'text-brand-steel hover:bg-brand-gray-bg hover:text-brand-black'
                 )}
