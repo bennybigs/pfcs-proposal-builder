@@ -29,3 +29,22 @@ Setup that should already be true: Supabase project live, schema applied, your e
    team" and no data.
 10. `curl -H "Authorization: Bearer <CRON_SECRET>" https://pfcs-proposal-builder.vercel.app/api/keepalive`
     returns `{"ok":true,...}`.
+
+## Phase 2 — Pipeline
+
+1. `/crm/pipeline` shows six columns (Inquiry → Lost) with per-column deal counts and
+   dollar totals in each header.
+2. Drag a card to another column → it moves, a toast confirms ("Inquiry → Proposal Sent"),
+   and the contact's timeline gains a stage-change entry. On a phone, press-and-hold ~0.2s
+   then drag (a quick swipe still scrolls the board).
+3. Every card also has a **Move to…** select that does the same without dragging.
+4. Cards show contact name, value, segment chip, and "Nd in stage". Moving a card resets
+   its days-in-stage to 0.
+5. Click a card → the deal drawer slides in: edit value (blur saves), expected close,
+   probability, segment, notes; the header links to the contact.
+6. **Won** closes the drawer, the card lands in Won, "Deal won — $X" appears on the
+   timeline. **Lost** asks for a reason first.
+7. Dashboard strip: open value per stage, green "Won this month" (uses the date it was
+   marked won), and "Win rate (12 mo)" = won ÷ (won + lost).
+8. Segment chips at top-right filter the whole board.
+9. At 390px width the columns scroll horizontally and snap; the strip scrolls too.
