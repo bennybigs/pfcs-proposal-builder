@@ -157,3 +157,26 @@ Setup that should already be true: Supabase project live, schema applied, your e
 4. As a non-admin: own card shows password change only; other cards are read-only info.
 5. Adding a teammate auto-opens their card so setting the starter password is the natural
    next step.
+
+## Reporting & inbound phase (R1–R4)
+
+R1 — Stage history: move any deal between stages, then in Supabase:
+`select * from deal_stage_history order by changed_at desc limit 5;` — one row per move,
+`from_stage`/`to_stage` filled, creation rows have `from_stage = null`. Trigger-based, so
+deals created by the API get history too (verified).
+
+R2 — Source detail: edit a contact → under Source, the "Source detail" box suggests
+existing campaign names for that bucket as you type (verified: two "Home Show 2026"
+contacts make it a suggestion for the third). Shows on the contact badge, deal drawer
+("via Trade Show · Home Show 2026"), CSV export/import.
+
+R3 — Reports (/crm/reports): range presets + custom (URL-shareable), segment chips,
+six sections, per-table + full CSV export. RECONCILED: seeded 3 won deals worth exactly
+$317,000 in the last 12 months → headline showed $317,000, avg $105,667, win rate 75%,
+Trade Show $275,000 (87%) / Website $42,000 (13%). Seeds removed after.
+
+R4 — Inbound leads: POST /api/inbound-lead with x-api-key. Verified: new lead → 201 +
+contact + deal; same email again with different segment → same contact, second deal
+(created_contact:false); no key → 401. All three calls in inbound_lead_log with key
+label. Docs for integrators: /crm/docs/inbound-leads (also docs/inbound-leads.md).
+Keys live in Vercel env INBOUND_API_KEYS as comma-separated label:secret pairs.
