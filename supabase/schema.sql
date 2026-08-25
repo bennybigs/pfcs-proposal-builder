@@ -27,8 +27,32 @@ exception when duplicate_object then null; end $$;
 create table if not exists public.team_members (
   email        text primary key,
   display_name text not null default '',
+  is_admin     boolean not null default false,          -- admins manage this list
   added_at     timestamptz not null default now()
 );
+alter table public.team_members add column if not exists is_admin boolean not null default false;
+
+-- Admins gate team management; every-member access still gates the data.
+create or replace function public.is_team_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.team_members where email = auth.email() and is_admin);
+$$;
+
+-- The team can never lose its last admin (no self-inflicted lockouts).
+create or replace function public.guard_last_admin() returns trigger
+language plpgsql as $$
+begin
+  if old.is_admin and (tg_op = 'DELETE' or new.is_admin = false) then
+    if (select count(*) from public.team_members where is_admin) <= 1 then
+      raise exception 'At least one admin is required — promote someone else first';
+    end if;
+  end if;
+  return coalesce(new, old);
+end $$;
+
+drop trigger if exists team_last_admin_guard on public.team_members;
+create trigger team_last_admin_guard before update or delete on public.team_members
+  for each row execute function public.guard_last_admin();
 
 -- security definer so RLS checks don't recurse into team_members' own RLS
 create or replace function public.is_team_member() returns boolean
@@ -150,24 +174,24 @@ alter table public.tasks          enable row level security;
 alter table public.proposal_links enable row level security;
 alter table public.heartbeat      enable row level security;
 
--- team_members: readable AND manageable by the team from the app's Team
--- page. The one guard rail: you can never delete YOURSELF — so the list can
--- never be emptied and nobody can lock the whole team out.
+-- team_members: every member can READ the list; only ADMINS manage it
+-- (add, rename, promote/demote, remove). Guard rails: you can't delete your
+-- own row, and the last-admin trigger blocks losing the final admin.
 drop policy if exists "team read" on public.team_members;
 create policy "team read" on public.team_members
   for select using (public.is_team_member());
 
 drop policy if exists "team add" on public.team_members;
 create policy "team add" on public.team_members
-  for insert with check (public.is_team_member());
+  for insert with check (public.is_team_admin());
 
 drop policy if exists "team rename" on public.team_members;
 create policy "team rename" on public.team_members
-  for update using (public.is_team_member()) with check (public.is_team_member());
+  for update using (public.is_team_admin()) with check (public.is_team_admin());
 
 drop policy if exists "team remove others" on public.team_members;
 create policy "team remove others" on public.team_members
-  for delete using (public.is_team_member() and email <> auth.email());
+  for delete using (public.is_team_admin() and email <> auth.email());
 
 do $$
 declare t text;

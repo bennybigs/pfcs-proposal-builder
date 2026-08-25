@@ -4,7 +4,17 @@ import { sb } from '@/lib/supabase';
 export interface TeamMember {
   email: string;
   display_name: string;
+  is_admin: boolean;
   added_at: string;
+}
+
+export async function setAdmin(email: string, isAdmin: boolean): Promise<void> {
+  const { error, count } = await sb()
+    .from('team_members')
+    .update({ is_admin: isAdmin }, { count: 'exact' })
+    .eq('email', email);
+  if (error) throw error;
+  if (!count) throw new Error('No permission — only admins can change roles.');
 }
 
 export async function listTeam(): Promise<TeamMember[]> {
@@ -42,5 +52,9 @@ export function useTeamMutations() {
     onSuccess: invalidate,
   });
   const remove = useMutation({ mutationFn: removeTeamMember, onSuccess: invalidate });
-  return { add, remove };
+  const admin = useMutation({
+    mutationFn: ({ email, isAdmin }: { email: string; isAdmin: boolean }) => setAdmin(email, isAdmin),
+    onSuccess: invalidate,
+  });
+  return { add, remove, admin };
 }

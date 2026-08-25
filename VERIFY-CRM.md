@@ -130,3 +130,17 @@ Setup that should already be true: Supabase project live, schema applied, your e
    on the spot, so they skip "Create account" and just sign in with what you texted.
 4. Guard rails: only signed-in team members can call it, and only for emails on the team
    list (the API refuses anything else).
+
+## Admin roles
+
+1. `/crm/team` as an ADMIN (shield badge): you see the add row, and every member row has
+   shield (toggle admin), key (set password), trash (remove). Toggling the shield promotes/
+   demotes with a toast; the database refuses to demote or remove the LAST admin.
+2. As a NON-admin: no add row, no shields/trashes — just the list, an explanatory note, and
+   a key icon on YOUR OWN row only. The API also refuses a non-admin setting anyone else's
+   password (server-side, not just hidden buttons).
+3. The sign-in card says "Team members only" — no Create account button, no self-signup
+   (signups are disabled platform-wide; accounts exist only when an admin sets a password).
+   "Forgot password? Email me a sign-in link" remains for recovery.
+4. Onboarding flow: admin adds email → key icon → starter password → text link + password
+   → teammate signs in directly.

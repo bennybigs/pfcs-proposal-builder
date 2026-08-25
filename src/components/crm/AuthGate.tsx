@@ -105,7 +105,6 @@ function Shell({ children }: { children?: React.ReactNode }) {
 function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'password' | 'link'>('password');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -123,28 +122,11 @@ function SignIn() {
     if (err) {
       setError(
         /invalid login credentials/i.test(err.message)
-          ? 'No account with that email + password. New here? Use "Create account".'
+          ? "Email and password don't match. New here? Ask your admin to set your password — or use the email link below."
           : err.message
       );
     }
     // success: onAuthStateChange takes over
-  };
-
-  const createAccount = async () => {
-    setBusy(true);
-    setError('');
-    const { error: err } = await supabase!.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-    setBusy(false);
-    if (err) {
-      setError(
-        /already registered/i.test(err.message)
-          ? 'That email already has an account — use "Sign in" with its password.'
-          : err.message
-      );
-    }
   };
 
   const sendLink = async () => {
@@ -164,8 +146,7 @@ function SignIn() {
       <div className="mx-auto max-w-sm rounded-lg border bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-brand-black">PFCS CRM</h2>
         <p className="mt-1 text-sm text-brand-steel">
-          Team sign-in. First time? Enter your email, pick a password, and hit
-          &quot;Create account&quot; — you&apos;re in immediately.
+          Team members only. New here? Your admin sets you up with a password.
         </p>
         <div className="mt-4 grid gap-2">
           <Input
@@ -175,8 +156,7 @@ function SignIn() {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
-          {mode === 'password' && (
-            <>
+          <>
               <Input
                 type="password"
                 placeholder="Password (8+ characters)"
@@ -185,21 +165,11 @@ function SignIn() {
                 autoComplete="current-password"
                 onKeyDown={(e) => e.key === 'Enter' && emailOk && password.length >= 8 && signIn()}
               />
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={signIn} disabled={busy || !emailOk || password.length < 8}>
-                  {busy ? '…' : 'Sign in'}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={createAccount}
-                  disabled={busy || !emailOk || password.length < 8}
-                >
-                  Create account
-                </Button>
-              </div>
+              <Button className="w-full" onClick={signIn} disabled={busy || !emailOk || password.length < 8}>
+                {busy ? '…' : 'Sign in'}
+              </Button>
               <Button variant="outline" className="w-full" onClick={sendLink} disabled={busy || !emailOk}>
-                {busy ? '…' : 'No password? Email me a sign-in link'}
+                {busy ? '…' : 'Forgot password? Email me a sign-in link'}
               </Button>
               {sent && (
                 <p className="text-sm text-brand-steel">
@@ -207,29 +177,7 @@ function SignIn() {
                 </p>
               )}
             </>
-          )}
-          {mode === 'link' &&
-            (sent ? (
-              <p className="text-sm text-brand-steel">
-                Check your email — we sent a sign-in link to <b>{email}</b>. Open it on this
-                device.
-              </p>
-            ) : (
-              <Button onClick={sendLink} disabled={busy || !emailOk}>
-                {busy ? '…' : 'Email me a sign-in link'}
-              </Button>
-            ))}
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            className="mt-1 text-left text-xs text-brand-steel underline-offset-2 hover:underline"
-            onClick={() => {
-              setMode(mode === 'password' ? 'link' : 'password');
-              setError('');
-              setSent(false);
-            }}
-          >
-            {mode === 'password' ? 'Prefer an emailed sign-in link?' : 'Use a password instead'}
-          </button>
         </div>
       </div>
     </Shell>

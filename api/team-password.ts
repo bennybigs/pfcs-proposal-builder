@@ -2,10 +2,9 @@
 // changing ANOTHER user's password needs the service-role key.
 //
 // Authorization model: the caller must present their own valid Supabase
-// session token AND be listed in team_members; the target email must also be
-// in team_members. Within those walls, any team member can set any team
-// member's password — deliberate for a 2–3 person trusted crew (the team
-// list itself is the security boundary).
+// session token AND be listed in team_members. Anyone may set their OWN
+// password; setting someone ELSE's requires is_admin on the caller's row.
+// The target must be on the team list either way.
 //
 // If the target has never signed in, the auth user is created on the spot
 // (confirmed, with the given password) — so a brand-new teammate can skip
@@ -31,12 +30,14 @@ async function callerEmail(req: VercelRequest): Promise<string | null> {
   return u.email ?? null;
 }
 
-async function isTeamMember(email: string): Promise<boolean> {
+async function teamRow(email: string): Promise<{ email: string; is_admin: boolean } | null> {
   const r = await fetch(
-    `${URL_()}/rest/v1/team_members?email=eq.${encodeURIComponent(email.toLowerCase())}&select=email`,
+    `${URL_()}/rest/v1/team_members?email=eq.${encodeURIComponent(email.toLowerCase())}&select=email,is_admin`,
     { headers: admin() }
   );
-  return r.ok && ((await r.json()) as unknown[]).length > 0;
+  if (!r.ok) return null;
+  const rows = (await r.json()) as { email: string; is_admin: boolean }[];
+  return rows[0] ?? null;
 }
 
 async function findUserId(email: string): Promise<string | null> {
@@ -61,8 +62,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const caller = await callerEmail(req);
   if (!caller) return res.status(401).json({ error: 'Sign in first' });
-  if (!(await isTeamMember(caller))) return res.status(403).json({ error: 'Not on the team' });
-  if (!(await isTeamMember(targetEmail))) {
+  const callerRow = await teamRow(caller);
+  if (!callerRow) return res.status(403).json({ error: 'Not on the team' });
+  const self = caller.toLowerCase() === targetEmail.toLowerCase();
+  if (!self && !callerRow.is_admin) {
+    return res.status(403).json({ error: "Only admins can set someone else's password" });
+  }
+  if (!(await teamRow(targetEmail))) {
     return res.status(403).json({ error: 'That email is not on the team list — add it there first' });
   }
 

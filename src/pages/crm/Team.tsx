@@ -2,7 +2,8 @@
 // them the /crm link, and they sign themselves in with a magic link. RLS
 // guard rail: nobody can remove their own row, so the list can't be emptied.
 import { useState } from 'react';
-import { KeyRound, Trash2, UserPlus } from 'lucide-react';
+import { KeyRound, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,8 +21,9 @@ import { formatDateUS } from '@/lib/format';
 
 export default function Team() {
   const { data: team = [], isLoading } = useTeam();
-  const { add, remove } = useTeamMutations();
+  const { add, remove, admin } = useTeamMutations();
   const myEmail = useSessionEmail();
+  const iAmAdmin = !!team.find((m) => m.email === myEmail)?.is_admin;
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
@@ -75,13 +77,23 @@ export default function Team() {
     <div className="mx-auto max-w-xl">
       <h1 className="text-xl font-bold text-brand-black">Team</h1>
       <p className="mt-1 text-sm text-brand-steel">
-        Everyone listed here can use the CRM. Add an email, then text them the link —{' '}
-        <b>{window.location.origin}/crm</b> — where they enter that email, pick a password,
-        and tap &quot;Create account&quot;. They&apos;re in immediately; no waiting on any
-        email. Nobody else can see anything, even if they find the link.
+        {iAmAdmin ? (
+          <>
+            Everyone listed here can use the CRM; <b>admins</b> (shield) also manage this
+            list. To add someone: enter their email, set them a starter password (key icon
+            on their row), then text them the link — <b>{window.location.origin}/crm</b> —
+            with the password. They sign straight in.
+          </>
+        ) : (
+          <>
+            Everyone listed here can use the CRM. Only admins (shield) can add or remove
+            people — ask one of them for changes. You can reset your own password with the
+            key icon on your row.
+          </>
+        )}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm">
+      <div className={iAmAdmin ? 'mt-4 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm' : 'hidden'}>
         <Input
           type="email"
           className="min-w-44 flex-1"
@@ -115,15 +127,40 @@ export default function Team() {
                 </div>
                 {m.display_name && <div className="text-xs text-brand-steel">{m.email}</div>}
               </div>
+              {m.is_admin && (
+                <Badge variant="secondary" className="shrink-0 gap-1 text-[10px]">
+                  <ShieldCheck className="h-3 w-3" /> admin
+                </Badge>
+              )}
               <span className="shrink-0 text-xs text-brand-steel">added {formatDateUS(m.added_at)}</span>
-              <button
-                onClick={() => { setPasswordFor(m); setNewPassword(''); }}
-                className="shrink-0 text-brand-steel/60 hover:text-brand-orange"
-                title="Set or reset this person's password"
-              >
-                <KeyRound className="h-4 w-4" />
-              </button>
-              {m.email !== myEmail && (
+              {iAmAdmin && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await admin.mutateAsync({ email: m.email, isAdmin: !m.is_admin });
+                      toast.success(m.is_admin ? 'Admin removed' : 'Made admin',
+                        m.is_admin ? `${m.display_name || m.email} is now a regular member.`
+                          : `${m.display_name || m.email} can now manage the team.`);
+                    } catch (err) {
+                      toast.error('Could not change role', err instanceof Error ? err.message : String(err));
+                    }
+                  }}
+                  className={m.is_admin ? 'shrink-0 text-brand-orange hover:text-brand-steel' : 'shrink-0 text-brand-steel/40 hover:text-brand-orange'}
+                  title={m.is_admin ? 'Remove admin rights' : 'Make admin — they can add/remove team members'}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                </button>
+              )}
+              {(iAmAdmin || m.email === myEmail) && (
+                <button
+                  onClick={() => { setPasswordFor(m); setNewPassword(''); }}
+                  className="shrink-0 text-brand-steel/60 hover:text-brand-orange"
+                  title={m.email === myEmail ? 'Change your password' : "Set or reset this person's password"}
+                >
+                  <KeyRound className="h-4 w-4" />
+                </button>
+              )}
+              {iAmAdmin && m.email !== myEmail && (
                 <button
                   onClick={() => setConfirmRemove(m)}
                   className="shrink-0 text-brand-steel/60 hover:text-red-600"
