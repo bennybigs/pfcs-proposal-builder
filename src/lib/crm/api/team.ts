@@ -8,6 +8,15 @@ export interface TeamMember {
   added_at: string;
 }
 
+export async function renameTeamMember(email: string, displayName: string): Promise<void> {
+  const { error, count } = await sb()
+    .from('team_members')
+    .update({ display_name: displayName.trim() }, { count: 'exact' })
+    .eq('email', email);
+  if (error) throw error;
+  if (!count) throw new Error('No permission — only admins can rename.');
+}
+
 export async function setAdmin(email: string, isAdmin: boolean): Promise<void> {
   const { error, count } = await sb()
     .from('team_members')
@@ -56,5 +65,9 @@ export function useTeamMutations() {
     mutationFn: ({ email, isAdmin }: { email: string; isAdmin: boolean }) => setAdmin(email, isAdmin),
     onSuccess: invalidate,
   });
-  return { add, remove, admin };
+  const rename = useMutation({
+    mutationFn: ({ email, name }: { email: string; name: string }) => renameTeamMember(email, name),
+    onSuccess: invalidate,
+  });
+  return { add, remove, admin, rename };
 }

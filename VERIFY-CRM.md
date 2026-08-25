@@ -144,3 +144,16 @@ Setup that should already be true: Supabase project live, schema applied, your e
    "Forgot password? Email me a sign-in link" remains for recovery.
 4. Onboarding flow: admin adds email → key icon → starter password → text link + password
    → teammate signs in directly.
+
+## Team member cards (click-to-manage)
+
+1. `/crm/team`: every row is clickable (chevron on the right). Clicking opens the member's
+   card with everything in one place.
+2. As an admin, a teammate's card has: Name (edit, saves on Enter/blur), Role (Administrator
+   switch with explanation), Password (set/reset — works before their first sign-in), and a
+   Danger zone (Remove, two-step inline confirm).
+3. Your own card: no Remove; the admin switch is disabled with a hint when you're the last
+   admin.
+4. As a non-admin: own card shows password change only; other cards are read-only info.
+5. Adding a teammate auto-opens their card so setting the starter password is the natural
+   next step.
