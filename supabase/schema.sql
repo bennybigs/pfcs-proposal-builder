@@ -226,6 +226,43 @@ drop policy if exists "admin read" on public.inbound_lead_log;
 create policy "admin read" on public.inbound_lead_log
   for select using (public.is_team_admin());
 
+-- ── cloud proposals + shared builder state ──────────────────────────
+-- The proposal builder's documents, one jsonb row per proposal, so every
+-- team member sees the same set from any device. Last-write-wins by the
+-- proposal's own updatedAt (fine for a 2–3 person team).
+create table if not exists public.proposals (
+  id         text primary key,                          -- the builder's uuid
+  data       jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by text not null default ''
+);
+
+-- Card library + company settings (one shared copy instead of per-browser).
+create table if not exists public.builder_shared (
+  key        text primary key,                          -- 'library'
+  data       jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by text not null default ''
+);
+
+alter table public.proposals      enable row level security;
+alter table public.builder_shared enable row level security;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['proposals', 'builder_shared'] loop
+    execute format('drop policy if exists "team select" on public.%I', t);
+    execute format('create policy "team select" on public.%I for select using (public.is_team_member())', t);
+    execute format('drop policy if exists "team insert" on public.%I', t);
+    execute format('create policy "team insert" on public.%I for insert with check (public.is_team_member())', t);
+    execute format('drop policy if exists "team update" on public.%I', t);
+    execute format('create policy "team update" on public.%I for update using (public.is_team_member()) with check (public.is_team_member())', t);
+    execute format('drop policy if exists "team delete" on public.%I', t);
+    execute format('create policy "team delete" on public.%I for delete using (public.is_team_member())', t);
+  end loop;
+end $$;
+
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (
   id         int primary key default 1,

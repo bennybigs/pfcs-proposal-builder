@@ -1,7 +1,34 @@
 import { Link, useLocation } from 'react-router-dom';
+import { Cloud, CloudOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useBuilderSyncStatus } from '@/lib/builderSync';
 import { InstallAppButton } from '@/components/layout/InstallAppButton';
+
+/** Cloud badge for proposal documents: synced / signed-out / error. */
+function SyncBadge() {
+  const status = useBuilderSyncStatus((s) => s.status);
+  if (status === 'off') return null;
+  if (status === 'signedOut')
+    return (
+      <Link to="/crm" title="Sign in (CRM) so proposals save to the team cloud, not just this browser"
+        className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-brand-steel hover:bg-brand-gray-bg">
+        <CloudOff className="h-3.5 w-3.5" /> <span className="hidden md:inline">Local only</span>
+      </Link>
+    );
+  const looks = {
+    syncing: { cls: 'text-brand-steel', label: 'Syncing…' },
+    synced: { cls: 'text-green-600', label: 'Team cloud' },
+    error: { cls: 'text-red-600', label: 'Sync error' },
+  } as const;
+  const l = looks[status];
+  return (
+    <span title="Proposal documents are synced to the team cloud"
+      className={cn('flex items-center gap-1 px-2 py-1 text-xs', l.cls)}>
+      <Cloud className="h-3.5 w-3.5" /> <span className="hidden md:inline">{l.label}</span>
+    </span>
+  );
+}
 
 // Two products at the top; each area carries its own sub-navigation.
 const NAV = [
@@ -47,6 +74,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <SyncBadge />
           <InstallAppButton />
           {right}
         </div>

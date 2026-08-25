@@ -15,10 +15,17 @@ const Reports = lazy(() => import('@/pages/crm/Reports'));
 const InboundLeadsDoc = lazy(() => import('@/pages/crm/InboundLeadsDoc'));
 const Integrations = lazy(() => import('@/pages/crm/Integrations'));
 import { Toaster } from '@/components/ui/toast';
+import { useBuilderCloudSync } from '@/lib/builderSync';
+
+function BuilderSync() {
+  useBuilderCloudSync();
+  return null;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
+      <BuilderSync />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/proposal/:id" element={<Editor />} />
