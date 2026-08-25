@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Dashboard from '@/pages/Dashboard';
 import Editor from '@/pages/Editor';
@@ -10,6 +11,7 @@ import ContactDetail from '@/pages/crm/ContactDetail';
 import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
 import Team from '@/pages/crm/Team';
+const Reports = lazy(() => import('@/pages/crm/Reports'));
 import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
@@ -27,6 +29,14 @@ export default function App() {
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="team" element={<Team />} />
+          <Route
+            path="reports"
+            element={
+              <Suspense fallback={<p className="text-sm text-brand-steel">Loading reports…</p>}>
+                <Reports />
+              </Suspense>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

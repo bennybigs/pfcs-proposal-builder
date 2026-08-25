@@ -179,6 +179,30 @@ create policy "team select" on public.deal_stage_history
 alter table public.contacts add column if not exists archived boolean not null default false;
 alter table public.contacts add column if not exists source_detail text;
 
+-- ── reporting views ─────────────────────────────────────────────────
+-- security_invoker: the caller's RLS applies (team members only see rows).
+-- won_at/lost_at come from stage history (survives later stage churn better
+-- than stage_entered_at, and the backfill made them equal on day one).
+create or replace view public.report_deals with (security_invoker = on) as
+select d.id, d.title, d.stage, d.segment, d.value, d.created_at,
+       d.stage_entered_at, d.lost_reason, d.contact_id,
+       c.name as contact_name, c.source, c.source_detail, c.archived,
+       (select max(h.changed_at) from public.deal_stage_history h
+          where h.deal_id = d.id and h.to_stage = 'won')  as won_at,
+       (select max(h.changed_at) from public.deal_stage_history h
+          where h.deal_id = d.id and h.to_stage = 'lost') as lost_at
+from public.deals d
+join public.contacts c on c.id = d.contact_id;
+
+create or replace view public.report_stage_entries with (security_invoker = on) as
+select h.deal_id, h.from_stage, h.to_stage, h.changed_at,
+       d.segment, c.source, c.source_detail, c.archived
+from public.deal_stage_history h
+join public.deals d on d.id = h.deal_id
+join public.contacts c on c.id = d.contact_id;
+
+grant select on public.report_deals, public.report_stage_entries to authenticated;
+
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (
   id         int primary key default 1,
