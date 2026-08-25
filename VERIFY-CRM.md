@@ -191,3 +191,39 @@ Keys live in Vercel env INBOUND_API_KEYS as comma-separated label:secret pairs.
 3. VERIFIED cross-device: teammate A created a proposal; teammate B on a wiped browser
    signed in and saw it on the dashboard immediately. Local storage remains the offline
    cache; signed-out use is unchanged.
+
+## Leads inbox (lead lifecycle)
+
+"Lead" is a stage of a contact's life, not a separate list: **New lead → Contacted →
+Qualified → Customer**, plus **On hold**, **Disqualified**, and plain **Contact** (out of
+the funnel). New / Contacted / On hold live in **/crm/leads**; the red counter on the CRM
+tab counts new leads + on-hold leads whose follow-up date has arrived (polls every 60s,
+visible from any page, even the proposal builder).
+
+Click-through:
+
+1. **Red dot**: with no leads waiting there is no counter. POST a test lead to
+   /api/inbound-lead (or add a contact with Lead stage "New lead") → within a minute the
+   CRM tab shows a red count; the Leads subnav shows the same count.
+2. **Leads tab** (/crm/leads): the lead appears under "New" with an age chip ("12m") —
+   it turns red once a new lead has waited 4+ hours. Source + campaign shown on the row.
+3. **Log call** → toast, lead moves to the "Contacted" section (first human touch:
+   call/text/email/meeting/site visit all do this, from the Leads row or the contact
+   page's quick-log bar).
+4. **Qualify** → if they already have an open deal (inbound leads do) they're marked
+   qualified; otherwise a deal is created at Inquiry. Either way they leave the inbox
+   and the counter drops. Moving any of their deals in the pipeline also auto-qualifies;
+   winning a deal marks them **Customer**.
+5. **Hold** → date + reason dialog; they move to "On hold". On the follow-up date they
+   light the red counter again and the row is highlighted "due — follow up".
+6. **⋯ menu**: "Move to Contacts" (legit contact, not a sales lead) and "Disqualify…"
+   (reason goes on the timeline; nothing is deleted — a later inbound inquiry from the
+   same email/phone automatically puts them back in "New").
+7. **Contact page**: the colored lifecycle badge next to Source is a picker — every
+   stage can be set by hand; On hold shows an amber banner with the resurface date.
+8. Bulk **CSV imports** land as plain Contacts (inbox stays clean); a contact created
+   from a proposal is born Qualified.
+
+Verified without sign-in (REST as a throwaway team member, since deleted): badge count
+query, RLS on the new columns, backfill (existing contacts with deals → qualified, none
+in the inbox). The signed-in click-through above is yours.

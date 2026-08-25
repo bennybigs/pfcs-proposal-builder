@@ -33,17 +33,22 @@ import { ContactDialog } from '@/components/crm/ContactDialog';
 import { ContactFiles } from '@/components/crm/ContactFiles';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
+import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import { useContactActivities, useLogActivity } from '@/lib/crm/api/activities';
 import { useContactDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTasks, useTaskMutations } from '@/lib/crm/api/tasks';
 import { useDealProposalLinks } from '@/lib/crm/api/proposalLinks';
 import {
   ACTIVITY_META,
+  LEAD_STATUSES,
+  LEAD_STATUS_META,
   SEGMENT_META,
   SOURCE_LABEL,
   STAGE_META,
   formatDollars,
   type ActivityType,
+  type Contact,
+  type LeadStatus,
 } from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -178,6 +183,7 @@ export default function ContactDetail() {
                 {SOURCE_LABEL[contact.source]}
                 {contact.source_detail ? ` · ${contact.source_detail}` : ''}
               </Badge>
+              <LeadStatusControl contact={contact} />
               {contact.tags.map((t) => (
                 <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
               ))}
@@ -210,6 +216,14 @@ export default function ContactDetail() {
           </Button>
         </div>
         {contact.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-brand-steel">{contact.notes}</p>}
+        {contact.lead_status === 'on_hold' && (
+          <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span className="font-medium">On hold</span>
+            {contact.lead_hold_until
+              ? ` — resurfaces in the Leads inbox on ${formatDateUS(contact.lead_hold_until)}.`
+              : ' — no follow-up date set; they wait in the Leads inbox.'}
+          </div>
+        )}
         {contact.archived && (
           <div className="mt-3 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             <span className="font-medium">Archived</span> — hidden from the contact list and pipeline.
@@ -355,6 +369,45 @@ export default function ContactDetail() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * The lifecycle badge doubles as a picker — the stage mostly moves itself
+ * (log a call, open a deal, win it), but any status can be set by hand here.
+ */
+function LeadStatusControl({ contact }: { contact: Contact }) {
+  const { update } = useContactMutations();
+  const meta = LEAD_STATUS_META[contact.lead_status];
+  return (
+    <select
+      title="Lead stage — usually moves itself; set by hand when needed"
+      value={contact.lead_status}
+      disabled={update.isPending}
+      onChange={async (e) => {
+        const to = e.target.value as LeadStatus;
+        try {
+          await update.mutateAsync({
+            id: contact.id,
+            patch: { lead_status: to, lead_hold_until: to === 'on_hold' ? contact.lead_hold_until : null },
+          });
+          void refreshLeadBadge();
+          toast.success(`Lead stage: ${LEAD_STATUS_META[to].label}`);
+        } catch (err) {
+          toast.error('Could not update', err instanceof Error ? err.message : String(err));
+        }
+      }}
+      className={cn(
+        'cursor-pointer appearance-none rounded-full border-0 px-2 py-0.5 text-[10px] font-semibold',
+        meta.color
+      )}
+    >
+      {LEAD_STATUSES.map((s) => (
+        <option key={s} value={s}>
+          {LEAD_STATUS_META[s].label}
+        </option>
+      ))}
+    </select>
   );
 }
 

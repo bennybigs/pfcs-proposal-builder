@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sb } from '@/lib/supabase';
-import type { Activity, ActivityType } from '@/lib/crm/types';
+import { markContactedIfNew } from './contacts';
+import { HUMAN_TOUCH_TYPES, type Activity, type ActivityType } from '@/lib/crm/types';
 
 export interface ActivityInput {
   contact_id: string;
@@ -18,6 +19,14 @@ export async function logActivity(input: ActivityInput): Promise<Activity> {
     .select()
     .single();
   if (error) throw error;
+  // Lead lifecycle: the first human touch flips a new lead to "contacted".
+  if (HUMAN_TOUCH_TYPES.includes(input.type)) {
+    try {
+      await markContactedIfNew(input.contact_id);
+    } catch {
+      // lifecycle bookkeeping must never fail the log itself
+    }
+  }
   return data as Activity;
 }
 
@@ -58,6 +67,9 @@ export function useLogActivity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: logActivity,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['activities'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['activities'] });
+      qc.invalidateQueries({ queryKey: ['contacts'] }); // lead status may have flipped
+    },
   });
 }

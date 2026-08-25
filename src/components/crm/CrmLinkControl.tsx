@@ -18,6 +18,7 @@ import { toast } from '@/components/ui/toast';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { useProposalStore } from '@/store/useProposalStore';
 import { customerInfoToContact } from '@/lib/crm/integration/mapping';
+import { promoteLeadOnDeal } from '@/lib/crm/api/contacts';
 import { grandTotal } from '@/lib/pricing';
 import { STAGE_META, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
 import type { Proposal } from '@/types';
@@ -154,7 +155,8 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
       const user = (await supabase!.auth.getUser()).data.user;
       const { data, error } = await supabase!
         .from('contacts')
-        .insert({ ...base, owner: user?.id ?? null })
+        // already being written a proposal — born qualified, skips the Leads inbox
+        .insert({ ...base, lead_status: 'qualified', owner: user?.id ?? null })
         .select()
         .single();
       if (error) throw error;
@@ -180,6 +182,8 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
         .select()
         .single();
       if (error) throw error;
+      // opening a deal qualifies a lead still in triage
+      try { await promoteLeadOnDeal(picked.id); } catch { /* non-fatal */ }
       await finish(picked, data as Deal);
     } catch (err) {
       toast.error('Could not create deal', err instanceof Error ? err.message : String(err));

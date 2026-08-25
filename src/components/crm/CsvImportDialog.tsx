@@ -133,6 +133,8 @@ export function CsvImportDialog({ open, onOpenChange, existing }: Props) {
           source_detail: rec.source_detail.replace(/\s+/g, ' ').trim() || null,
           tags: rec.tags.split(/[,;]/).map((t) => t.trim()).filter(Boolean),
           notes: rec.notes,
+          // bulk imports are rolodex, not fresh inquiries — keep the Leads inbox clean
+          lead_status: 'none',
         });
         created++;
       }

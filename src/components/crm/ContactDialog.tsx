@@ -21,7 +21,16 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 import { useContactMutations, useContacts } from '@/lib/crm/api/contacts';
-import { SOURCES, SOURCE_LABEL, type Contact, type ContactSource } from '@/lib/crm/types';
+import { refreshLeadBadge } from '@/lib/crm/leadBadge';
+import {
+  LEAD_STATUSES,
+  LEAD_STATUS_META,
+  SOURCES,
+  SOURCE_LABEL,
+  type Contact,
+  type ContactSource,
+  type LeadStatus,
+} from '@/lib/crm/types';
 
 interface Props {
   open: boolean;
@@ -40,6 +49,7 @@ const empty = {
   source_detail: '',
   tags: '' as string, // comma-separated in the form
   notes: '',
+  lead_status: 'new' as LeadStatus, // new contacts land in the Leads inbox by default
 };
 
 /** Collapse runs of whitespace, trim ends — casing preserved. */
@@ -63,6 +73,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
             source_detail: contact.source_detail ?? '',
             tags: contact.tags.join(', '),
             notes: contact.notes,
+            lead_status: contact.lead_status,
           }
         : empty
     );
@@ -79,6 +90,9 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
     source_detail: cleanDetail(form.source_detail) || null,
     tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
     notes: form.notes,
+    lead_status: form.lead_status,
+    // switching away from on-hold clears the resurface date
+    lead_hold_until: form.lead_status === 'on_hold' ? (contact?.lead_hold_until ?? null) : null,
   });
 
   const save = async () => {
@@ -91,6 +105,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
         toast.success('Contact added');
         onCreated?.(created);
       }
+      void refreshLeadBadge();
       onOpenChange(false);
     } catch (err) {
       toast.error('Could not save contact', err instanceof Error ? err.message : String(err));
@@ -144,6 +159,23 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
               excludeId={contact?.id}
               onChange={(v) => set({ source_detail: v })}
             />
+          </Field>
+          <Field label="Lead stage — New shows in the Leads inbox">
+            <Select
+              value={form.lead_status}
+              onValueChange={(v) => set({ lead_status: v as LeadStatus })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LEAD_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {LEAD_STATUS_META[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Tags (comma-separated)">
             <Input

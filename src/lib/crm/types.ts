@@ -18,6 +18,21 @@ export type ActivityType =
   | 'note'
   | 'proposal_event';
 
+/**
+ * Lead is a stage of a contact's life, not a separate record. new/contacted/
+ * on_hold live in the Leads inbox; qualified/customer/none/disqualified are
+ * out of triage. Most transitions are automatic — see api/activities.ts and
+ * api/deals.ts.
+ */
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'on_hold'
+  | 'qualified'
+  | 'customer'
+  | 'disqualified'
+  | 'none';
+
 export interface Contact {
   id: string;
   name: string;
@@ -30,6 +45,8 @@ export interface Contact {
   tags: string[];
   notes: string;
   archived: boolean;
+  lead_status: LeadStatus;
+  lead_hold_until: string | null; // ISO date — when an on-hold lead resurfaces
   created_at: string;
   updated_at: string;
   owner: string | null;
@@ -123,6 +140,32 @@ export const SOURCE_LABEL: Record<ContactSource, string> = {
   cold: 'Cold',
   other: 'Other',
 };
+
+export const LEAD_STATUSES: LeadStatus[] = [
+  'new',
+  'contacted',
+  'on_hold',
+  'qualified',
+  'customer',
+  'none',
+  'disqualified',
+];
+
+export const LEAD_STATUS_META: Record<LeadStatus, { label: string; color: string }> = {
+  new: { label: 'New lead', color: 'bg-red-100 text-red-700' },
+  contacted: { label: 'Contacted', color: 'bg-sky-100 text-sky-700' },
+  on_hold: { label: 'On hold', color: 'bg-amber-100 text-amber-800' },
+  qualified: { label: 'Qualified', color: 'bg-green-100 text-green-700' },
+  customer: { label: 'Customer', color: 'bg-emerald-100 text-emerald-800' },
+  disqualified: { label: 'Disqualified', color: 'bg-gray-200 text-gray-600' },
+  none: { label: 'Contact', color: 'bg-gray-100 text-gray-600' },
+};
+
+/** Statuses that appear in the Leads inbox. */
+export const LEAD_INBOX_STATUSES: LeadStatus[] = ['new', 'contacted', 'on_hold'];
+
+/** Human outreach — the activity types that flip a new lead to "contacted". */
+export const HUMAN_TOUCH_TYPES: ActivityType[] = ['call', 'text', 'email', 'meeting', 'site_visit'];
 
 export const ACTIVITY_META: Record<ActivityType, { label: string }> = {
   call: { label: 'Call' },

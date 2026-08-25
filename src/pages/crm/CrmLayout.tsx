@@ -6,9 +6,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { AuthGate, useSessionEmail } from '@/components/crm/AuthGate';
 import { supabase } from '@/lib/supabase';
+import { useLeadBadge } from '@/lib/crm/leadBadge';
 import { cn } from '@/lib/utils';
 
 const SUBNAV = [
+  { to: '/crm/leads', label: 'Leads' },
   { to: '/crm', label: 'Contacts' },
   { to: '/crm/pipeline', label: 'Pipeline' },
   { to: '/crm/tasks', label: 'Tasks' },
@@ -25,6 +27,7 @@ const queryClient = new QueryClient({
 
 export default function CrmLayout() {
   const { pathname } = useLocation();
+  const leadCount = useLeadBadge((s) => s.count);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate>
@@ -50,6 +53,11 @@ export default function CrmLayout() {
                     )}
                   >
                     {item.label}
+                    {item.to === '/crm/leads' && leadCount > 0 && (
+                      <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">
+                        {leadCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sb } from '@/lib/supabase';
 import { STAGE_META, type Deal, type DealStage } from '@/lib/crm/types';
 import { logActivity } from './activities';
+import { markCustomer, promoteLeadOnDeal } from './contacts';
 
 export type DealInput = Partial<Omit<Deal, 'id' | 'created_at' | 'updated_at'>> & {
   contact_id: string;
@@ -32,6 +33,12 @@ export async function createDeal(input: DealInput): Promise<Deal> {
     .select()
     .single();
   if (error) throw error;
+  // Lead lifecycle: a team member opening a deal qualifies the lead.
+  try {
+    await promoteLeadOnDeal(input.contact_id);
+  } catch {
+    // lifecycle bookkeeping never fails the deal itself
+  }
   return data as Deal;
 }
 
@@ -62,6 +69,14 @@ export async function moveDealStage(deal: Deal, to: DealStage, lostReason?: stri
     type: 'note',
     body: `Stage: ${STAGE_META[deal.stage].label} → ${STAGE_META[to].label}${to === 'lost' && lostReason ? ` — ${lostReason}` : ''}`,
   });
+  // Lead lifecycle: winning makes a customer; any other move on a deal that
+  // is being actively worked qualifies a lead still sitting in triage.
+  try {
+    if (to === 'won') await markCustomer(deal.contact_id);
+    else await promoteLeadOnDeal(deal.contact_id);
+  } catch {
+    // never fail the stage move over lifecycle bookkeeping
+  }
 }
 
 // ── hooks ────────────────────────────────────────────────────────────
@@ -83,6 +98,7 @@ export function useDealMutations() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['deals'] });
     qc.invalidateQueries({ queryKey: ['activities'] });
+    qc.invalidateQueries({ queryKey: ['contacts'] }); // lead status may have moved
   };
   const create = useMutation({ mutationFn: createDeal, onSuccess: invalidate });
   const update = useMutation({

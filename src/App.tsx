@@ -7,6 +7,7 @@ import LibraryEditor from '@/pages/LibraryEditor';
 import Settings from '@/pages/Settings';
 import CrmLayout from '@/pages/crm/CrmLayout';
 import Contacts from '@/pages/crm/Contacts';
+import Leads from '@/pages/crm/Leads';
 import ContactDetail from '@/pages/crm/ContactDetail';
 import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/crm" element={<CrmLayout />}>
           <Route index element={<Contacts />} />
+          <Route path="leads" element={<Leads />} />
           <Route path="contacts/:id" element={<ContactDetail />} />
           <Route path="pipeline" element={<Pipeline />} />
           <Route path="tasks" element={<Tasks />} />

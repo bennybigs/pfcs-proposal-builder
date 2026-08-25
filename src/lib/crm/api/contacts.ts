@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sb } from '@/lib/supabase';
-import type { Contact } from '@/lib/crm/types';
+import { refreshLeadBadge } from '@/lib/crm/leadBadge';
+import type { Contact, LeadStatus } from '@/lib/crm/types';
 
 export type ContactInput = Omit<Contact, 'id' | 'created_at' | 'updated_at' | 'owner'>;
 
@@ -35,6 +36,56 @@ export async function updateContact(id: string, patch: Partial<ContactInput>): P
 export async function deleteContact(id: string): Promise<void> {
   const { error } = await sb().from('contacts').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ── lead lifecycle ───────────────────────────────────────────────────
+// The transitions live here so every code path (Leads inbox, contact page,
+// deal creation, quick-log) moves leads the same way.
+
+export async function setLeadStatus(
+  id: string,
+  status: LeadStatus,
+  holdUntil?: string | null
+): Promise<void> {
+  const { error } = await sb()
+    .from('contacts')
+    .update({
+      lead_status: status,
+      lead_hold_until: status === 'on_hold' ? (holdUntil ?? null) : null,
+    })
+    .eq('id', id);
+  if (error) throw error;
+  void refreshLeadBadge();
+}
+
+/** First human touch: new → contacted. No-op for every other status. */
+export async function markContactedIfNew(contactId: string): Promise<void> {
+  await sb()
+    .from('contacts')
+    .update({ lead_status: 'contacted' })
+    .eq('id', contactId)
+    .eq('lead_status', 'new');
+  void refreshLeadBadge();
+}
+
+/** A deal exists / moved forward: anything still in triage → qualified. */
+export async function promoteLeadOnDeal(contactId: string): Promise<void> {
+  await sb()
+    .from('contacts')
+    .update({ lead_status: 'qualified', lead_hold_until: null })
+    .eq('id', contactId)
+    .in('lead_status', ['new', 'contacted', 'on_hold', 'none']);
+  void refreshLeadBadge();
+}
+
+/** A deal was won — they're a customer now, whatever came before. */
+export async function markCustomer(contactId: string): Promise<void> {
+  await sb()
+    .from('contacts')
+    .update({ lead_status: 'customer', lead_hold_until: null })
+    .eq('id', contactId)
+    .neq('lead_status', 'customer');
+  void refreshLeadBadge();
 }
 
 // ── hooks ────────────────────────────────────────────────────────────

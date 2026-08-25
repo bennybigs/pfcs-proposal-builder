@@ -358,3 +358,44 @@ end $$;
 
 -- heartbeat: no client policies at all — only the service-role keepalive
 -- touches it (service role bypasses RLS).
+
+-- ── lead lifecycle (2026-08-25) ─────────────────────────────────────
+-- "Lead" is a stage of a contact's life, not a separate table. The Leads
+-- inbox shows new / contacted / on_hold; everything else is out of triage.
+-- Transitions are app-driven (see src/lib/crm/api/*): logging a human
+-- activity flips new→contacted, creating/advancing a deal flips →qualified,
+-- winning a deal flips →customer. on_hold carries an optional resurface date.
+do $$ begin
+  create type lead_status as enum
+    ('new', 'contacted', 'on_hold', 'qualified', 'customer', 'disqualified', 'none');
+exception when duplicate_object then null; end $$;
+
+alter table public.contacts add column if not exists lead_status lead_status not null default 'new';
+alter table public.contacts add column if not exists lead_hold_until date;
+
+create index if not exists contacts_lead_status_idx on public.contacts (lead_status);
+
+-- One-time backfill for contacts that predate the lifecycle — guarded by a
+-- marker so re-running schema.sql never clobbers statuses set by the team.
+create table if not exists public.schema_markers (
+  key        text primary key,
+  applied_at timestamptz not null default now()
+);
+alter table public.schema_markers enable row level security;  -- no policies: service-role only
+
+do $$ begin
+  if not exists (select 1 from public.schema_markers where key = 'lead_status_backfill') then
+    update public.contacts c set lead_status =
+      case
+        when exists (select 1 from public.deals d where d.contact_id = c.id and d.stage = 'won')
+          then 'customer'
+        when exists (select 1 from public.deals d where d.contact_id = c.id)
+          then 'qualified'
+        when exists (select 1 from public.activities a where a.contact_id = c.id
+                       and a.type in ('call', 'text', 'email', 'meeting', 'site_visit'))
+          then 'contacted'
+        else 'none'
+      end::lead_status;
+    insert into public.schema_markers (key) values ('lead_status_backfill');
+  end if;
+end $$;

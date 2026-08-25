@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Cloud, CloudOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useBuilderSyncStatus } from '@/lib/builderSync';
+import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
 import { InstallAppButton } from '@/components/layout/InstallAppButton';
 
 /** Cloud badge for proposal documents: synced / signed-out / error. */
@@ -47,6 +49,10 @@ const PROPOSAL_SUBNAV = [
 export function AppHeader({ right }: { right?: React.ReactNode }) {
   const { pathname } = useLocation();
   const logoUrl = useLibraryStore((s) => s.settings.logoUrl);
+  // Red lead counter on the CRM tab — visible from every page, so a fresh
+  // inquiry gets noticed even while building proposals. Polls once a minute.
+  const leadCount = useLeadBadge((s) => s.count);
+  useEffect(() => startLeadBadge(), []);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
@@ -69,6 +75,14 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
                 )}
               >
                 {item.label}
+                {item.to === '/crm' && leadCount > 0 && (
+                  <span
+                    title={`${leadCount} lead${leadCount === 1 ? '' : 's'} waiting`}
+                    className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white"
+                  >
+                    {leadCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

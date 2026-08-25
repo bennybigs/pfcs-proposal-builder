@@ -157,10 +157,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name, email, phone, address,
           source, source_detail: sourceDetail,
           notes: '',
+          lead_status: 'new', // lights the red counter in the app
         }),
       });
       contact = rows[0];
       createdContact = true;
+    } else {
+      // Re-engagement: a known contact who was out of the funnel (regular
+      // contact or previously disqualified) inquired again — back to the
+      // Leads inbox. Active leads, qualified deals, and customers keep
+      // their status. Never blocks intake.
+      try {
+        await fetch(
+          `${URL_()}/rest/v1/contacts?id=eq.${contact.id}&lead_status=in.(none,disqualified)`,
+          {
+            method: 'PATCH',
+            headers: { ...HEADERS(), Prefer: 'return=minimal' },
+            body: JSON.stringify({ lead_status: 'new', lead_hold_until: null }),
+          }
+        );
+      } catch {
+        // lifecycle bookkeeping never breaks intake
+      }
     }
 
     const segLabel = { barndominium: 'Barndominium', ag_shop: 'Ag Shop', storage_garage: 'Storage/Garage', other: 'New project' }[segment];
