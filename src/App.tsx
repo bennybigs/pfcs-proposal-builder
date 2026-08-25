@@ -12,6 +12,7 @@ import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
 import Team from '@/pages/crm/Team';
 const Reports = lazy(() => import('@/pages/crm/Reports'));
+const InboundLeadsDoc = lazy(() => import('@/pages/crm/InboundLeadsDoc'));
 import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
@@ -34,6 +35,14 @@ export default function App() {
             element={
               <Suspense fallback={<p className="text-sm text-brand-steel">Loading reports…</p>}>
                 <Reports />
+              </Suspense>
+            }
+          />
+          <Route
+            path="docs/inbound-leads"
+            element={
+              <Suspense fallback={<p className="text-sm text-brand-steel">Loading…</p>}>
+                <InboundLeadsDoc />
               </Suspense>
             }
           />

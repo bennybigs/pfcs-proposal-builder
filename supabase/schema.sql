@@ -203,6 +203,29 @@ join public.contacts c on c.id = d.contact_id;
 
 grant select on public.report_deals, public.report_stage_entries to authenticated;
 
+-- ── inbound lead log ────────────────────────────────────────────────
+-- Every call to /api/inbound-lead, success or failure, with the raw payload.
+-- Cheap insurance when an integrator says "we sent 40, you show 30".
+-- Written only by the service role; admins can read it.
+create table if not exists public.inbound_lead_log (
+  id          uuid primary key default gen_random_uuid(),
+  received_at timestamptz not null default now(),
+  key_label   text not null default '',
+  status      int not null,
+  created_contact boolean,
+  contact_id  uuid,
+  deal_id     uuid,
+  error       text,
+  payload     jsonb
+);
+create index if not exists ill_received_idx on public.inbound_lead_log (received_at desc);
+create index if not exists ill_key_idx on public.inbound_lead_log (key_label, received_at desc);
+
+alter table public.inbound_lead_log enable row level security;
+drop policy if exists "admin read" on public.inbound_lead_log;
+create policy "admin read" on public.inbound_lead_log
+  for select using (public.is_team_admin());
+
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (
   id         int primary key default 1,
