@@ -128,6 +128,52 @@ create table if not exists public.proposal_links (
   unique (deal_id, proposal_id)
 );
 
+-- ── deal stage history ──────────────────────────────────────────────
+-- Every stage change, recorded by a TRIGGER (not app code) so the inbound
+-- endpoint and any future integration are covered automatically. Reports
+-- read won-dates and stages-over-time from here.
+create table if not exists public.deal_stage_history (
+  id         uuid primary key default gen_random_uuid(),
+  deal_id    uuid not null references public.deals (id) on delete cascade,
+  from_stage deal_stage,                                -- null = deal created
+  to_stage   deal_stage not null,
+  changed_at timestamptz not null default now(),
+  changed_by text                                       -- auth email; null for service/API writes
+);
+
+create index if not exists dsh_deal_idx  on public.deal_stage_history (deal_id, changed_at);
+create index if not exists dsh_stage_idx on public.deal_stage_history (to_stage, changed_at);
+
+create or replace function public.record_stage_change() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into public.deal_stage_history (deal_id, from_stage, to_stage, changed_by)
+    values (new.id, null, new.stage, auth.email());
+  elsif old.stage is distinct from new.stage then
+    insert into public.deal_stage_history (deal_id, from_stage, to_stage, changed_by)
+    values (new.id, old.stage, new.stage, auth.email());
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists deals_stage_history on public.deals;
+create trigger deals_stage_history after insert or update of stage on public.deals
+  for each row execute function public.record_stage_change();
+
+-- Backfill: one creation row per deal that has no history yet. Idempotent.
+insert into public.deal_stage_history (deal_id, from_stage, to_stage, changed_at)
+select d.id, null, d.stage, d.stage_entered_at
+from public.deals d
+where not exists (select 1 from public.deal_stage_history h where h.deal_id = d.id);
+
+alter table public.deal_stage_history enable row level security;
+-- read-only for the team; ONLY the trigger writes (definer rights) — no
+-- client write policies at all.
+drop policy if exists "team select" on public.deal_stage_history;
+create policy "team select" on public.deal_stage_history
+  for select using (public.is_team_member());
+
 -- migration for databases created before the archived column existed
 alter table public.contacts add column if not exists archived boolean not null default false;
 
