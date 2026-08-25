@@ -26,6 +26,7 @@ export interface Contact {
   address: string;
   company_name: string;
   source: ContactSource;
+  source_detail: string | null;
   tags: string[];
   notes: string;
   archived: boolean;

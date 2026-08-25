@@ -72,6 +72,7 @@ create table if not exists public.contacts (
   tags         text[] not null default '{}',
   notes        text not null default '',
   archived     boolean not null default false,          -- hidden, not gone
+  source_detail text,                                    -- campaign-level attribution ("Home Show 2026")
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   owner        uuid references auth.users (id) on delete set null
@@ -176,6 +177,7 @@ create policy "team select" on public.deal_stage_history
 
 -- migration for databases created before the archived column existed
 alter table public.contacts add column if not exists archived boolean not null default false;
+alter table public.contacts add column if not exists source_detail text;
 
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (

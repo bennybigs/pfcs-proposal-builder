@@ -58,6 +58,7 @@ export default function Contacts() {
         address: c.address,
         company: c.company_name,
         source: c.source,
+        source_detail: c.source_detail ?? '',
         tags: c.tags.join('; '),
         notes: c.notes,
       }))

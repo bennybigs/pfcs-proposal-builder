@@ -33,6 +33,7 @@ import { grandTotal } from '@/lib/pricing';
 import {
   SEGMENTS,
   SEGMENT_META,
+  SOURCE_LABEL,
   STAGES,
   STAGE_META,
   formatDollars,
@@ -145,6 +146,11 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             <Link to={`/crm/contacts/${contact.id}`} className="text-brand-orange hover:underline">
               {contact.name}
             </Link>
+          )}
+          {contact && (
+            <span className="text-xs text-brand-steel">
+              via {SOURCE_LABEL[contact.source]}{contact.source_detail ? ` · ${contact.source_detail}` : ''}
+            </span>
           )}
         </div>
 

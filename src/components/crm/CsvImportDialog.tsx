@@ -30,6 +30,7 @@ const FIELDS = [
   { key: 'address', label: 'Address' },
   { key: 'company_name', label: 'Company / farm' },
   { key: 'source', label: 'Source' },
+  { key: 'source_detail', label: 'Source detail / campaign' },
   { key: 'tags', label: 'Tags' },
   { key: 'notes', label: 'Notes' },
 ] as const;
@@ -43,6 +44,7 @@ const guess = (header: string): FieldKey | '' => {
   if (/phone|cell|mobile/.test(h)) return 'phone';
   if (/address|street|city/.test(h)) return 'address';
   if (/company|farm|business/.test(h)) return 'company_name';
+  if (/detail|campaign/.test(h)) return 'source_detail';
   if (/source|how.*hear/.test(h)) return 'source';
   if (/tag/.test(h)) return 'tags';
   if (/note|comment/.test(h)) return 'notes';
@@ -94,7 +96,7 @@ export function CsvImportDialog({ open, onOpenChange, existing }: Props) {
     if (!rows.length) return [];
     return rows.map((cells) => {
       const rec: Record<FieldKey, string> = {
-        name: '', email: '', phone: '', address: '', company_name: '', source: '', tags: '', notes: '',
+        name: '', email: '', phone: '', address: '', company_name: '', source: '', source_detail: '', tags: '', notes: '',
       };
       cells.forEach((cell, i) => {
         const field = mapping[i];
@@ -128,6 +130,7 @@ export function CsvImportDialog({ open, onOpenChange, existing }: Props) {
           address: rec.address,
           company_name: rec.company_name,
           source: normSource(rec.source),
+          source_detail: rec.source_detail.replace(/\s+/g, ' ').trim() || null,
           tags: rec.tags.split(/[,;]/).map((t) => t.trim()).filter(Boolean),
           notes: rec.notes,
         });

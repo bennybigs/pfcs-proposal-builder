@@ -172,7 +172,10 @@ export default function ContactDetail() {
                   {contact.email}
                 </a>
               )}
-              <Badge variant="outline" className="text-[10px]">{SOURCE_LABEL[contact.source]}</Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {SOURCE_LABEL[contact.source]}
+                {contact.source_detail ? ` · ${contact.source_detail}` : ''}
+              </Badge>
               {contact.tags.map((t) => (
                 <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
               ))}
