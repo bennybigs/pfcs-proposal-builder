@@ -28,6 +28,8 @@ import { useDealMutations } from '@/lib/crm/api/deals';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useDealProposalLinks } from '@/lib/crm/api/proposalLinks';
 import { useLogActivity } from '@/lib/crm/api/activities';
+import { useTeam, memberName } from '@/lib/crm/api/team';
+import { useSessionEmail } from '@/components/crm/AuthGate';
 import { useProposalStore } from '@/store/useProposalStore';
 import { grandTotal } from '@/lib/pricing';
 import {
@@ -49,8 +51,13 @@ interface Props {
   onClose: () => void;
 }
 
+const UNASSIGNED = '__unassigned__';
+
 export function DealDrawer({ deal, contact, onClose }: Props) {
-  const { update, move } = useDealMutations();
+  const { update, move, assign } = useDealMutations();
+  const { data: team = [] } = useTeam();
+  const me = useSessionEmail();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const log = useLogActivity();
   const { data: links = [] } = useDealProposalLinks(deal ? [deal.id] : []);
   const localProposals = useProposalStore((s) => s.proposals);
@@ -199,6 +206,49 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               </Select>
             </Field>
           </div>
+          <Field label="Assigned to">
+            {iAmAdmin ? (
+              <Select
+                value={deal.assigned_to ?? UNASSIGNED}
+                onValueChange={(v) => {
+                  const toEmail = v === UNASSIGNED ? null : v;
+                  assign.mutate(
+                    {
+                      deal,
+                      toEmail,
+                      assigneeName: memberName(team, toEmail),
+                      byName: memberName(team, me),
+                    },
+                    {
+                      onSuccess: () =>
+                        toast.success(toEmail ? `Assigned to ${memberName(team, toEmail)}` : 'Unassigned'),
+                      onError: (err) =>
+                        toast.error('Could not assign', err instanceof Error ? err.message : String(err)),
+                    }
+                  );
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {team.map((t) => (
+                    <SelectItem key={t.email} value={t.email}>
+                      {t.display_name || t.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={memberName(team, deal.assigned_to)} disabled />
+            )}
+            {deal.closed_by && (
+              <p className="text-xs text-brand-steel">
+                Closed by {memberName(team, deal.closed_by)} — locked in when the deal was won.
+              </p>
+            )}
+          </Field>
           <Field label="Stage">
             <Select
               value={deal.stage}

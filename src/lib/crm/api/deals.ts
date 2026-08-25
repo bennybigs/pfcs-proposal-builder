@@ -79,6 +79,30 @@ export async function moveDealStage(deal: Deal, to: DealStage, lostReason?: stri
   }
 }
 
+/**
+ * Assignment goes through here so every change lands on the timeline and the
+ * assignee's email gets flushed (the DB trigger already wrote the in-app
+ * notification). assigneeName/byName are display names for the log line.
+ */
+export async function assignDeal(
+  deal: Deal,
+  toEmail: string | null,
+  assigneeName: string,
+  byName: string
+): Promise<void> {
+  if (deal.assigned_to === toEmail) return;
+  const { error } = await sb().from('deals').update({ assigned_to: toEmail }).eq('id', deal.id);
+  if (error) throw error;
+  await logActivity({
+    contact_id: deal.contact_id,
+    deal_id: deal.id,
+    type: 'note',
+    body: toEmail ? `Assigned to ${assigneeName} by ${byName}` : `Unassigned by ${byName}`,
+  });
+  // fire-and-forget: deliver the notification email the trigger just queued
+  void fetch('/api/notify-flush', { method: 'POST' }).catch(() => undefined);
+}
+
 // ── hooks ────────────────────────────────────────────────────────────
 
 export function useDeals() {
@@ -110,5 +134,22 @@ export function useDealMutations() {
       moveDealStage(deal, to, lostReason),
     onSuccess: invalidate,
   });
-  return { create, update, move };
+  const assign = useMutation({
+    mutationFn: ({
+      deal,
+      toEmail,
+      assigneeName,
+      byName,
+    }: {
+      deal: Deal;
+      toEmail: string | null;
+      assigneeName: string;
+      byName: string;
+    }) => assignDeal(deal, toEmail, assigneeName, byName),
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+  return { create, update, move, assign };
 }

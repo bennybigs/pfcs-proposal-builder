@@ -132,7 +132,7 @@ function MemberCard({
   adminCount: number;
   onClose: () => void;
 }) {
-  const { remove, admin, rename } = useTeamMutations();
+  const { remove, admin, rename, emailPref } = useTeamMutations();
   const [nameDraft, setNameDraft] = useState(member.display_name);
   const [password, setPassword] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -240,6 +240,32 @@ function MemberCard({
                 checked={member.is_admin}
                 disabled={lastAdmin || admin.isPending}
                 onCheckedChange={toggleAdmin}
+              />
+            </div>
+          </Section>
+        )}
+
+        {(iAmAdmin || isSelf) && (
+          <Section label="Notifications">
+            <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+              <div>
+                <div className="text-sm font-medium text-brand-black">Email notifications</div>
+                <div className="text-xs text-brand-steel">
+                  Deal assignments and inbound leads, sent to {member.email}. The in-app bell
+                  always works.
+                </div>
+              </div>
+              <Switch
+                checked={member.email_notifications}
+                disabled={emailPref.isPending}
+                onCheckedChange={async (on) => {
+                  try {
+                    await emailPref.mutateAsync({ email: member.email, on });
+                    toast.success(on ? 'Email notifications on' : 'Email notifications off');
+                  } catch (err) {
+                    toast.error('Could not update', err instanceof Error ? err.message : String(err));
+                  }
+                }}
               />
             </div>
           </Section>

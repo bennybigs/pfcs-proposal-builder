@@ -17,6 +17,9 @@ export interface ReportDeal {
   lost_reason: string | null;
   contact_id: string;
   contact_name: string;
+  assigned_to: string | null;
+  closed_by: string | null;
+  created_via: string;
   source: ContactSource;
   source_detail: string | null;
   archived: boolean;

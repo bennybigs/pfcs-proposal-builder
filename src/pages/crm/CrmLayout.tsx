@@ -5,12 +5,15 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { AuthGate, useSessionEmail } from '@/components/crm/AuthGate';
+import { NotificationBell } from '@/components/crm/NotificationBell';
+import { useNotifications } from '@/lib/crm/api/notifications';
 import { supabase } from '@/lib/supabase';
 import { useLeadBadge } from '@/lib/crm/leadBadge';
 import { cn } from '@/lib/utils';
 
 const SUBNAV = [
   { to: '/crm/leads', label: 'Leads' },
+  { to: '/crm/my', label: 'My Leads' },
   { to: '/crm', label: 'Contacts' },
   { to: '/crm/pipeline', label: 'Pipeline' },
   { to: '/crm/tasks', label: 'Tasks' },
@@ -26,57 +29,72 @@ const queryClient = new QueryClient({
 });
 
 export default function CrmLayout() {
-  const { pathname } = useLocation();
-  const leadCount = useLeadBadge((s) => s.count);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate>
-        <div className="min-h-screen bg-brand-gray-bg">
-          <AppHeader />
-          <div className="border-b bg-white">
-            <nav className="mx-auto flex max-w-6xl items-center gap-1 px-4 py-2">
-              <SessionBadge />
-              {SUBNAV.map((item) => {
-                const active =
-                  item.to === '/crm'
-                    ? pathname === '/crm' || pathname.startsWith('/crm/contacts')
-                    : pathname.startsWith(item.to);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={cn(
-                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      active
-                        ? 'bg-brand-orange/10 text-brand-orange'
-                        : 'text-brand-steel hover:bg-brand-gray-bg hover:text-brand-black'
-                    )}
-                  >
-                    {item.label}
-                    {item.to === '/crm/leads' && leadCount > 0 && (
-                      <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">
-                        {leadCount}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-          <main className="mx-auto max-w-6xl px-4 py-6">
-            <Outlet />
-          </main>
-        </div>
+        <CrmShell />
       </AuthGate>
     </QueryClientProvider>
   );
 }
 
-/** Who am I + one-tap sign out — lives at the right edge of the CRM sub-nav. */
+/** Inside the gate + query provider, so nav badges can fetch. */
+function CrmShell() {
+  const { pathname } = useLocation();
+  const leadCount = useLeadBadge((s) => s.count);
+  const { data: notifications = [] } = useNotifications();
+  const unreadAssigned = notifications.filter((n) => !n.read_at && n.type === 'deal_assigned').length;
+  return (
+    <div className="min-h-screen bg-brand-gray-bg">
+      <AppHeader />
+      <div className="border-b bg-white">
+        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-2">
+          <SessionBadge />
+          {SUBNAV.map((item) => {
+            const active =
+              item.to === '/crm'
+                ? pathname === '/crm' || pathname.startsWith('/crm/contacts')
+                : pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  'shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-brand-orange/10 text-brand-orange'
+                    : 'text-brand-steel hover:bg-brand-gray-bg hover:text-brand-black'
+                )}
+              >
+                {item.label}
+                {item.to === '/crm/leads' && leadCount > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">
+                    {leadCount}
+                  </span>
+                )}
+                {item.to === '/crm/my' && unreadAssigned > 0 && (
+                  <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-[18px] text-white">
+                    {unreadAssigned}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+/** Who am I + bell + one-tap sign out — right edge of the CRM sub-nav. */
 function SessionBadge() {
   const email = useSessionEmail();
   return (
     <span className="order-last ml-auto flex items-center gap-2 text-xs text-brand-steel">
+      <NotificationBell />
       <span className="hidden max-w-48 truncate sm:inline" title={email}>{email}</span>
       <button
         className="rounded-md border px-2 py-1 font-medium hover:bg-brand-gray-bg"

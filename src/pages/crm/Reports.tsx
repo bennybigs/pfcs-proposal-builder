@@ -46,6 +46,8 @@ import {
   formatDollars,
   type DealSegment,
 } from '@/lib/crm/types';
+import { useTeam } from '@/lib/crm/api/team';
+import { useSessionEmail } from '@/components/crm/AuthGate';
 import { cn } from '@/lib/utils';
 
 // Brand palette for chart series (from the brief)
@@ -59,6 +61,9 @@ const PRESETS: RangePreset[] = [
 export default function Reports() {
   const { data: deals = [], isLoading } = useReportDeals();
   const { data: entries = [] } = useStageEntries();
+  const { data: team = [] } = useTeam();
+  const me = useSessionEmail();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const [params, setParams] = useSearchParams();
 
   const preset = (params.get('range') as RangePreset) || 'last_12';
@@ -131,6 +136,41 @@ export default function Reports() {
     }).filter((r) => r.wonCount || r.leads);
   }, [deals, from, to]);
 
+  // ── by rep: closed_by for won credit, assigned_to for open pipeline ─
+  const byRep = useMemo(() => {
+    const rows = team.map((t) => {
+      const assignedLeads = created.filter((d) => d.assigned_to === t.email);
+      const repWon = won.filter((d) => d.closed_by === t.email);
+      const repLost = lost.filter((d) => d.assigned_to === t.email);
+      const cl = repWon.length + repLost.length;
+      const openPipeline = live.filter(
+        (d) => d.assigned_to === t.email && !['won', 'lost'].includes(d.stage)
+      );
+      return {
+        email: t.email,
+        name: t.display_name || t.email,
+        leads: assignedLeads.length,
+        wonCount: repWon.length,
+        wonValue: repWon.reduce((n, d) => n + d.value, 0),
+        winRate: cl ? Math.round((repWon.length / cl) * 100) : null,
+        pipeline: openPipeline.reduce((n, d) => n + d.value, 0),
+      };
+    });
+    const unassignedOpen = live.filter((d) => !d.assigned_to && !['won', 'lost'].includes(d.stage));
+    if (unassignedOpen.length) {
+      rows.push({
+        email: '',
+        name: 'Unassigned',
+        leads: created.filter((d) => !d.assigned_to).length,
+        wonCount: 0,
+        wonValue: 0,
+        winRate: null,
+        pipeline: unassignedOpen.reduce((n, d) => n + d.value, 0),
+      });
+    }
+    return rows.filter((r) => r.leads || r.wonCount || r.pipeline);
+  }, [team, created, won, lost, live]);
+
   // ── section 5: monthly trend ───────────────────────────────────────
   const months = useMemo(() => monthsBetween(from, to), [from, to]);
   const trend = useMemo(
@@ -197,6 +237,10 @@ export default function Reports() {
       ['segment', 'won count', 'won value', 'leads created', 'win rate %'],
       bySegment.map((r) => [SEGMENT_META[r.segment].label, String(r.wonCount), String(r.wonValue), String(r.leads), r.winRate === null ? '' : String(r.winRate)])
     )],
+    ['By rep', toCsv(
+      ['rep', 'leads assigned', 'won count', 'won value', 'win rate %', 'open pipeline'],
+      byRep.map((r) => [r.name, String(r.leads), String(r.wonCount), String(r.wonValue), r.winRate === null ? '' : String(r.winRate), String(r.pipeline)])
+    )],
     ['Monthly trend', toCsv(
       ['month', 'leads created', 'won value'],
       trend.map((r) => [r.month, String(r.leads), String(r.wonValue)])
@@ -213,7 +257,19 @@ export default function Reports() {
     download(`pfcs-report-${rangeSlug}.csv`, body);
   };
 
-  if (isLoading) return <p className="text-sm text-brand-steel">Loading…</p>;
+  if (isLoading || (team.length === 0 && !me)) {
+    return <p className="text-sm text-brand-steel">Loading…</p>;
+  }
+  if (team.length > 0 && !iAmAdmin) {
+    return (
+      <div className="rounded-lg border bg-white p-8 text-center shadow-sm">
+        <p className="font-medium text-brand-black">Reports are owner-only.</p>
+        <p className="mt-1 text-sm text-brand-steel">
+          Ask an admin if you need a number from here — your own pipeline lives in My Leads.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -345,10 +401,46 @@ export default function Reports() {
         )}
       </Section>
 
+      {/* 4b · by rep */}
+      <Section
+        title="By rep"
+        note="Won figures credit the rep who held the deal when it was won (locked at close). Gross sale value only — commission eligibility depends on the margin condition in job costing, not the CRM."
+        onExport={() => download(`pfcs-report-${rangeSlug}-by-rep.csv`, csvSections()[4][1])}
+      >
+        {byRep.length === 0 ? (
+          <Empty text="No assigned deals in this period yet." />
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-brand-steel">
+                <th className="py-1.5 font-medium">Rep</th>
+                <th className="py-1.5 text-right font-medium">Leads assigned</th>
+                <th className="py-1.5 text-right font-medium">Won</th>
+                <th className="py-1.5 text-right font-medium">Won $</th>
+                <th className="py-1.5 text-right font-medium">Win rate</th>
+                <th className="py-1.5 text-right font-medium">Open pipeline</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byRep.map((r) => (
+                <tr key={r.email || 'unassigned'} className="border-b last:border-b-0">
+                  <td className={cn('py-1.5', !r.email && 'italic text-brand-steel')}>{r.name}</td>
+                  <td className="py-1.5 text-right">{r.leads}</td>
+                  <td className="py-1.5 text-right">{r.wonCount}</td>
+                  <td className="py-1.5 text-right font-medium">{formatDollars(r.wonValue)}</td>
+                  <td className="py-1.5 text-right">{r.winRate === null ? '—' : `${r.winRate}%`}</td>
+                  <td className="py-1.5 text-right">{formatDollars(r.pipeline)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Section>
+
       {/* 5 · monthly trend */}
       <Section
         title="Monthly trend"
-        onExport={() => download(`pfcs-report-${rangeSlug}-trend.csv`, csvSections()[4][1])}
+        onExport={() => download(`pfcs-report-${rangeSlug}-trend.csv`, csvSections()[5][1])}
       >
         {trend.every((t) => !t.leads && !t.wonValue) ? (
           <Empty text="Nothing to chart in this period yet." />
@@ -378,7 +470,7 @@ export default function Reports() {
       <Section
         title="Stage entries per month"
         note="How many deals ENTERED each stage that month (from stage history)."
-        onExport={() => download(`pfcs-report-${rangeSlug}-stages.csv`, csvSections()[5][1])}
+        onExport={() => download(`pfcs-report-${rangeSlug}-stages.csv`, csvSections()[6][1])}
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

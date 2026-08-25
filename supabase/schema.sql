@@ -375,6 +375,159 @@ alter table public.contacts add column if not exists lead_hold_until date;
 
 create index if not exists contacts_lead_status_idx on public.contacts (lead_status);
 
+-- ── assignment + notifications (2026-08-25) ─────────────────────────
+-- Who owns a deal (assigned_to), who gets commission credit (closed_by — a
+-- snapshot taken the moment the deal is won, immune to later reassignment),
+-- and where the deal came from (created_via: 'app' | 'api'). Email-keyed to
+-- match team_members / tasks.assigned_to / activities.logged_by.
+alter table public.deals add column if not exists assigned_to text
+  references public.team_members (email) on update cascade on delete set null;
+alter table public.deals add column if not exists closed_by text;   -- snapshot, survives member removal
+alter table public.deals add column if not exists created_via text not null default 'app';
+create index if not exists deals_assigned_idx on public.deals (assigned_to);
+
+create or replace function public.snapshot_closed_by() returns trigger
+language plpgsql as $$
+begin
+  if new.stage = 'won' and (tg_op = 'INSERT' or old.stage is distinct from 'won')
+     and new.closed_by is null then
+    new.closed_by := new.assigned_to;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists deals_snapshot_closed_by on public.deals;
+create trigger deals_snapshot_closed_by before insert or update on public.deals
+  for each row execute function public.snapshot_closed_by();
+
+-- Per-member email preference. Members may edit their own row (prefs, name);
+-- a guard trigger stops non-admins from touching is_admin through that hole.
+alter table public.team_members add column if not exists email_notifications boolean not null default true;
+
+create or replace function public.guard_admin_flag() returns trigger
+language plpgsql as $$
+begin
+  if new.is_admin is distinct from old.is_admin
+     and auth.email() is not null            -- service role passes
+     and not public.is_team_admin() then
+    raise exception 'Only admins can change roles';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists team_guard_admin_flag on public.team_members;
+create trigger team_guard_admin_flag before update on public.team_members
+  for each row execute function public.guard_admin_flag();
+
+drop policy if exists "self update" on public.team_members;
+create policy "self update" on public.team_members
+  for update using (email = auth.email()) with check (email = auth.email());
+
+-- notifications: one row per person per event. channel is reserved so SMS
+-- can slot in later without a schema change.
+create table if not exists public.notifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_email text not null references public.team_members (email) on update cascade on delete cascade,
+  type       text not null check (type in ('deal_assigned', 'inbound_lead')),
+  channel    text not null default 'in_app',
+  deal_id    uuid references public.deals (id) on delete cascade,
+  title      text not null default '',
+  body       text not null default '',
+  read_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists notifications_user_idx on public.notifications (user_email, created_at desc);
+
+alter table public.notifications enable row level security;
+-- you see and update (mark read) only your own; only triggers/service write
+drop policy if exists "own select" on public.notifications;
+create policy "own select" on public.notifications
+  for select using (user_email = auth.email());
+drop policy if exists "own update" on public.notifications;
+create policy "own update" on public.notifications
+  for update using (user_email = auth.email()) with check (user_email = auth.email());
+
+-- every email send attempt, for "did Shawn actually get it?" moments
+create table if not exists public.notification_deliveries (
+  id                  uuid primary key default gen_random_uuid(),
+  notification_id     uuid not null references public.notifications (id) on delete cascade,
+  channel             text not null default 'email',
+  status              text not null,              -- sent | failed | skipped_pref_off
+  provider_message_id text,
+  error               text,
+  created_at          timestamptz not null default now(),
+  unique (notification_id, channel)
+);
+alter table public.notification_deliveries enable row level security;
+drop policy if exists "admin read" on public.notification_deliveries;
+create policy "admin read" on public.notification_deliveries
+  for select using (public.is_team_admin());
+
+-- Assignment → notify the new assignee (skip self-assignment). SECURITY
+-- DEFINER because the assigning member has no insert policy on notifications.
+create or replace function public.notify_deal_assigned() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  cname text;
+  who   text;
+begin
+  if new.assigned_to is null then return new; end if;
+  if tg_op = 'UPDATE' and old.assigned_to is not distinct from new.assigned_to then return new; end if;
+  if new.assigned_to = coalesce(auth.email(), '') then return new; end if;
+  select name into cname from public.contacts where id = new.contact_id;
+  select display_name into who from public.team_members where email = auth.email();
+  insert into public.notifications (user_email, type, deal_id, title, body)
+  values (
+    new.assigned_to, 'deal_assigned', new.id,
+    'Deal assigned: ' || new.title,
+    coalesce(cname, 'Unknown contact') || ' · ' || new.segment || ' · $' || round(new.value)::text
+      || case when auth.email() is not null
+           then ' — assigned by ' || coalesce(nullif(who, ''), auth.email()) else '' end
+  );
+  return new;
+end $$;
+
+drop trigger if exists deals_notify_assigned on public.deals;
+create trigger deals_notify_assigned after insert or update of assigned_to on public.deals
+  for each row execute function public.notify_deal_assigned();
+
+-- API-created deal → notify every admin (the unassigned queue owners).
+create or replace function public.notify_inbound_lead() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare cname text;
+begin
+  if new.created_via <> 'api' then return new; end if;
+  select name into cname from public.contacts where id = new.contact_id;
+  insert into public.notifications (user_email, type, deal_id, title, body)
+  select tm.email, 'inbound_lead', new.id,
+         'New inbound lead — unassigned',
+         coalesce(cname, 'Unknown contact') || ' · ' || new.segment || ' · $' || round(new.value)::text
+  from public.team_members tm
+  where tm.is_admin;
+  return new;
+end $$;
+
+drop trigger if exists deals_notify_inbound on public.deals;
+create trigger deals_notify_inbound after insert on public.deals
+  for each row execute function public.notify_inbound_lead();
+
+-- reporting views grow the assignment columns (drop first: create-or-replace
+-- cannot add columns mid-view; the grant below restores read access)
+drop view if exists public.report_deals;
+create view public.report_deals with (security_invoker = on) as
+select d.id, d.title, d.stage, d.segment, d.value, d.created_at,
+       d.stage_entered_at, d.lost_reason, d.contact_id,
+       d.assigned_to, d.closed_by, d.created_via,
+       c.name as contact_name, c.source, c.source_detail, c.archived,
+       (select max(h.changed_at) from public.deal_stage_history h
+          where h.deal_id = d.id and h.to_stage = 'won')  as won_at,
+       (select max(h.changed_at) from public.deal_stage_history h
+          where h.deal_id = d.id and h.to_stage = 'lost') as lost_at
+from public.deals d
+join public.contacts c on c.id = d.contact_id;
+
+grant select on public.report_deals to authenticated;
+
 -- One-time backfill for contacts that predate the lifecycle — guarded by a
 -- marker so re-running schema.sql never clobbers statuses set by the team.
 create table if not exists public.schema_markers (

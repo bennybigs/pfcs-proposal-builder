@@ -5,7 +5,24 @@ export interface TeamMember {
   email: string;
   display_name: string;
   is_admin: boolean;
+  email_notifications: boolean;
   added_at: string;
+}
+
+/** Display name for a member email, with a sensible fallback. */
+export function memberName(team: TeamMember[], email: string | null | undefined): string {
+  if (!email) return 'Unassigned';
+  const m = team.find((t) => t.email === email);
+  return m?.display_name || email;
+}
+
+export async function setEmailNotifications(email: string, on: boolean): Promise<void> {
+  const { error, count } = await sb()
+    .from('team_members')
+    .update({ email_notifications: on }, { count: 'exact' })
+    .eq('email', email);
+  if (error) throw error;
+  if (!count) throw new Error('No permission to change this preference.');
 }
 
 export async function renameTeamMember(email: string, displayName: string): Promise<void> {
@@ -69,5 +86,9 @@ export function useTeamMutations() {
     mutationFn: ({ email, name }: { email: string; name: string }) => renameTeamMember(email, name),
     onSuccess: invalidate,
   });
-  return { add, remove, admin, rename };
+  const emailPref = useMutation({
+    mutationFn: ({ email, on }: { email: string; on: boolean }) => setEmailNotifications(email, on),
+    onSuccess: invalidate,
+  });
+  return { add, remove, admin, rename, emailPref };
 }

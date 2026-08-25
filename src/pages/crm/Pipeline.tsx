@@ -29,6 +29,7 @@ import { toast } from '@/components/ui/toast';
 import { DealDrawer } from '@/components/crm/DealDrawer';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
+import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useRecentActivities } from '@/lib/crm/api/activities';
 import { useTasks } from '@/lib/crm/api/tasks';
 import { goneQuietDealIds } from '@/lib/crm/health';
@@ -55,6 +56,9 @@ export default function Pipeline() {
   const [params, setParams] = useSearchParams();
   const [dragging, setDragging] = useState<Deal | null>(null);
   const [segment, setSegment] = useState<DealSegment | null>(null);
+  const { data: team = [] } = useTeam();
+  // '' = everyone, '__unassigned__' = nobody, else a member email
+  const [assignee, setAssignee] = useState('');
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
   // archived contacts take their deals off the board and out of the numbers
@@ -65,8 +69,14 @@ export default function Pipeline() {
   const quiet = useMemo(() => goneQuietDealIds(activeDeals, activities, tasks), [activeDeals, activities, tasks]);
 
   const visible = useMemo(
-    () => (segment ? activeDeals.filter((d) => d.segment === segment) : activeDeals),
-    [activeDeals, segment]
+    () =>
+      activeDeals.filter((d) => {
+        if (segment && d.segment !== segment) return false;
+        if (assignee === '__unassigned__') return !d.assigned_to;
+        if (assignee) return d.assigned_to === assignee;
+        return true;
+      }),
+    [activeDeals, segment, assignee]
   );
   const byStage = useMemo(() => {
     const m = new Map<DealStage, Deal[]>(STAGES.map((s) => [s, []]));
@@ -131,6 +141,22 @@ export default function Pipeline() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-brand-black">Pipeline</h1>
         <div className="flex-1" />
+        {team.length > 1 && (
+          <select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            title="Filter by assignee"
+            className="h-7 cursor-pointer rounded-full border border-gray-200 bg-white px-2 text-xs font-medium text-brand-steel"
+          >
+            <option value="">Everyone</option>
+            <option value="__unassigned__">Unassigned</option>
+            {team.map((t) => (
+              <option key={t.email} value={t.email}>
+                {t.display_name || t.email}
+              </option>
+            ))}
+          </select>
+        )}
         {SEGMENTS.map((s) => (
           <button
             key={s}
@@ -186,6 +212,7 @@ export default function Pipeline() {
                 stage={stage}
                 deals={byStage.get(stage) ?? []}
                 contactName={(id) => contactById.get(id)?.name ?? '—'}
+                assigneeName={(email) => (email ? memberName(team, email) : null)}
                 quiet={quiet}
                 onOpen={(d) => {
                   params.set('deal', d.id);
@@ -218,6 +245,7 @@ function StageColumn({
   stage,
   deals,
   contactName,
+  assigneeName,
   quiet,
   onOpen,
   onMove,
@@ -225,6 +253,7 @@ function StageColumn({
   stage: DealStage;
   deals: Deal[];
   contactName: (contactId: string) => string;
+  assigneeName: (email: string | null) => string | null;
   quiet: Set<string>;
   onOpen: (deal: Deal) => void;
   onMove: (deal: Deal, to: DealStage) => void;
@@ -252,6 +281,7 @@ function StageColumn({
             key={d.id}
             deal={d}
             contactName={contactName(d.contact_id)}
+            assignee={assigneeName(d.assigned_to)}
             quiet={quiet.has(d.id)}
             onOpen={() => onOpen(d)}
             onMove={(to) => onMove(d, to)}
@@ -265,12 +295,14 @@ function StageColumn({
 function DealCard({
   deal,
   contactName,
+  assignee,
   quiet,
   onOpen,
   onMove,
 }: {
   deal: Deal;
   contactName: string;
+  assignee: string | null;
   quiet: boolean;
   onOpen: () => void;
   onMove: (to: DealStage) => void;
@@ -297,6 +329,11 @@ function DealCard({
           <span className="text-brand-steel">
             {days}d in stage
           </span>
+          {assignee && (
+            <Badge variant="outline" className="text-[10px]" title={`Assigned to ${assignee}`}>
+              {assignee}
+            </Badge>
+          )}
           {quiet && (
             <Badge className="bg-amber-100 text-[10px] text-amber-700 hover:bg-amber-100">gone quiet</Badge>
           )}

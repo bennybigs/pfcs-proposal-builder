@@ -64,8 +64,23 @@ export interface Deal {
   probability: number;
   lost_reason: string | null;
   notes: string;
+  assigned_to: string | null;  // team member email — who works this deal
+  closed_by: string | null;    // snapshot at won; commission attribution, never rewritten
+  created_via: string;         // 'app' | 'api'
   created_at: string;
   updated_at: string;
+}
+
+export interface Notification {
+  id: string;
+  user_email: string;
+  type: 'deal_assigned' | 'inbound_lead';
+  channel: string;
+  deal_id: string | null;
+  title: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
 }
 
 export interface Activity {

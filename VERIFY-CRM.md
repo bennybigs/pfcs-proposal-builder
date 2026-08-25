@@ -227,3 +227,46 @@ Click-through:
 Verified without sign-in (REST as a throwaway team member, since deleted): badge count
 query, RLS on the new columns, backfill (existing contacts with deals → qualified, none
 in the inbox). The signed-in click-through above is yours.
+
+## Assignment, My Leads, and notifications
+
+Built to the Phase-2/3 brief with the agreed adaptations: roles live on the existing
+team_members table (admin = owner, everyone else = rep — no separate profiles table),
+and visibility stays team-wide for now — assignment is for ownership, notifications,
+and commission attribution. Hard rep-only RLS walls are a separate step for when the
+sales hire has a start date.
+
+What's new:
+
+1. **New lead button** on /crm/leads (top-right on desktop, orange floating button on
+   phones). Name + phone-or-email required; segment, source + campaign typeahead,
+   assignee (admins pick; reps get themselves), notes. Duplicate email/phone offers
+   "Use existing contact" instead of silently duplicating. Creates the contact as a
+   New lead (stays in the inbox) plus a deal at Inquiry, then opens the deal.
+2. **Assignment**: "Assigned to" select in the deal drawer (admins; read-only for
+   others) and inline "Assign to…" on the Unassigned queue at the bottom of the Leads
+   screen. Every change lands on the timeline ("Assigned to Shawn by Ben"). The
+   Pipeline gets an assignee filter (Everyone / Unassigned / per person) and cards
+   show the assignee.
+3. **closed_by** — the moment a deal is marked Won, the current assignee is locked in
+   as closed_by. Verified: reassigning after the win does NOT change it. This is the
+   commission attribution field.
+4. **Notifications**: bell in the CRM sub-nav (unread count, latest 20, mark read /
+   mark all). Assignment → the assignee gets notified (not when assigning to
+   yourself). Inbound API lead → every admin gets "New inbound lead — unassigned".
+   The My Leads nav item badges unread assignments. Polls every 60s.
+5. **Email**: queued per notification, sent via Postmark by /api/notify-flush,
+   logged in notification_deliveries, per-person toggle on the Team page card.
+   ⚠️ Requires POSTMARK_SERVER_TOKEN in Vercel env (same setup command as e-sign);
+   until then emails stay queued (verified: flush returns 503 and loses nothing).
+   And until Postmark approves the account, only @mcsi.work recipients deliver.
+6. **My Leads** (/crm/my): your assigned deals grouped by stage with days-in-stage,
+   last touch, and overdue-task flags. Non-admin teammates land here by default.
+7. **Reports**: now owner-only, with a "By rep" section (won credit via closed_by,
+   open pipeline via assigned_to, gross-value disclaimer) and its own CSV export.
+
+Verified live on prod (2026-08-25): SQL trigger suite (assign → notification,
+self-assign skipped, won → closed_by snapshot, reassign-after-win immutable, API deal
+→ both admins notified); inbound curl → 201 + notifications + created_via=api;
+flush without token → 503, queue intact. Signed-in click-through is yours: assign a
+deal to Shawn → his bell badges within a minute and the timeline logs it.

@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   PauseCircle,
   Phone,
+  Plus,
   UserCheck,
   XCircle,
 } from 'lucide-react';
@@ -34,11 +35,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
+import { NewLeadDialog } from '@/components/crm/NewLeadDialog';
+import { useSessionEmail } from '@/components/crm/AuthGate';
 import { useContacts, useContactMutations, setLeadStatus } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
+import { useTeam, memberName, type TeamMember } from '@/lib/crm/api/team';
 import { useLogActivity, logActivity } from '@/lib/crm/api/activities';
 import { useLeadBadge, refreshLeadBadge } from '@/lib/crm/leadBadge';
-import { LEAD_STATUS_META, SOURCE_LABEL, type Contact } from '@/lib/crm/types';
+import { LEAD_STATUS_META, SOURCE_LABEL, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -60,8 +64,12 @@ const todayIso = () => {
 export default function Leads() {
   const { data: contacts = [], isLoading, error } = useContacts();
   const { data: deals = [] } = useDeals();
+  const { data: team = [] } = useTeam();
+  const me = useSessionEmail();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const qc = useQueryClient();
   const badgeCount = useLeadBadge((s) => s.count);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
 
   // The badge polls every minute from anywhere; when it moves while this
   // page is open (a lead just arrived), pull the fresh rows.
@@ -86,11 +94,29 @@ export default function Leads() {
 
   const total = fresh.length + inProgress.length + onHold.length;
 
+  const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
+  const unassigned = useMemo(
+    () =>
+      deals
+        .filter(
+          (d) =>
+            !d.assigned_to &&
+            !['won', 'lost'].includes(d.stage) &&
+            !contactById.get(d.contact_id)?.archived
+        )
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [deals, contactById]
+  );
+
   return (
-    <div>
+    <div className="pb-20 sm:pb-0">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-brand-black">Leads</h1>
         {total > 0 && <Badge variant="secondary">{total}</Badge>}
+        <div className="flex-1" />
+        <Button size="sm" className="hidden sm:inline-flex" onClick={() => setNewLeadOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" /> New lead
+        </Button>
       </div>
       <p className="mt-1 text-sm text-brand-steel">
         New inquiries waiting on a first move. Call fast, then{' '}
@@ -136,6 +162,82 @@ export default function Leads() {
           )}
         </div>
       )}
+
+      {iAmAdmin && unassigned.length > 0 && (
+        <div className="mt-6">
+          <Section title="Unassigned deals" hint="nobody owns these yet — hand them out">
+            {unassigned.map((d) => (
+              <UnassignedRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} />
+            ))}
+          </Section>
+        </div>
+      )}
+
+      {/* mobile: floating New-lead button, thumb-reachable */}
+      <button
+        onClick={() => setNewLeadOpen(true)}
+        title="New lead"
+        className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg hover:brightness-95 sm:hidden"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} />
+    </div>
+  );
+}
+
+/** One unassigned deal with an inline hand-out select (admins only see these). */
+function UnassignedRow({
+  deal,
+  contact,
+  team,
+  me,
+}: {
+  deal: Deal;
+  contact: Contact | undefined;
+  team: TeamMember[];
+  me: string;
+}) {
+  const { assign } = useDealMutations();
+  return (
+    <div className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0">
+      <Link to={`/crm/pipeline?deal=${deal.id}`} className="min-w-0 flex-1 hover:opacity-80">
+        <div className="truncate text-sm font-medium text-brand-black">{deal.title}</div>
+        <div className="mt-0.5 truncate text-xs text-brand-steel">
+          {contact?.name ?? '—'} · {formatDollars(deal.value)}
+          {deal.created_via === 'api' && ' · via API'}
+        </div>
+      </Link>
+      <select
+        value=""
+        disabled={assign.isPending}
+        onChange={(e) => {
+          const toEmail = e.target.value;
+          if (!toEmail) return;
+          assign.mutate(
+            {
+              deal,
+              toEmail,
+              assigneeName: memberName(team, toEmail),
+              byName: memberName(team, me),
+            },
+            {
+              onSuccess: () => toast.success('Assigned', `${deal.title} → ${memberName(team, toEmail)}`),
+              onError: (err) =>
+                toast.error('Could not assign', err instanceof Error ? err.message : String(err)),
+            }
+          );
+        }}
+        className="h-8 shrink-0 cursor-pointer rounded-md border bg-white px-2 text-xs text-brand-black"
+      >
+        <option value="">Assign to…</option>
+        {team.map((t) => (
+          <option key={t.email} value={t.email}>
+            {t.display_name || t.email}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

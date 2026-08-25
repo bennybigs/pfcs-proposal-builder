@@ -207,7 +207,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
  * Plain input + suggestion list built from Radix-free primitives (no new
  * libraries); still accepts brand-new values.
  */
-function SourceDetailInput({
+export function SourceDetailInput({
   value,
   source,
   excludeId,

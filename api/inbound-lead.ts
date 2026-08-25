@@ -189,6 +189,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: `${contact.name} — ${segLabel}`,
         segment,
         value: budget,
+        created_via: 'api', // fires the owners' inbound_lead notifications (DB trigger)
       }),
     });
     const deal = deals[0];
@@ -211,6 +212,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       key_label: key.label, status: 201, created_contact: createdContact,
       contact_id: contact.id, deal_id: deal.id, payload: b,
     });
+    // deliver the owners' notification emails now rather than on next app visit
+    try {
+      await fetch(`https://${String(req.headers.host)}/api/notify-flush`, { method: 'POST' });
+    } catch {
+      // email delivery is best-effort; the in-app bell has the notification
+    }
     return res.status(201).json({ contact_id: contact.id, deal_id: deal.id, created_contact: createdContact });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
