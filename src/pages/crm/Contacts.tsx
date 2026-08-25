@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
-import { Download, Plus, Upload } from 'lucide-react';
+import { Download, Mail, Phone, Plus, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -96,6 +96,10 @@ export default function Contacts() {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
+        <Chip active={!source && !tag && !showArchived}
+          onClick={() => { setSource(null); setTag(null); setShowArchived(false); }}>
+          All
+        </Chip>
         {SOURCES.map((s) => (
           <Chip key={s} active={source === s} onClick={() => setSource(source === s ? null : s)}>
             {SOURCE_LABEL[s]}
@@ -120,6 +124,17 @@ export default function Contacts() {
         <p className="mt-2 text-xs text-brand-steel">
           Archived contacts — hidden from the working list, everything kept. Open one to
           restore it.
+        </p>
+      )}
+      {(source || tag || debounced) && !showArchived && (
+        <p className="mt-2 text-xs text-brand-steel">
+          Showing {filtered.length} of {contacts.filter((c) => !c.archived).length} —{' '}
+          <button
+            className="font-medium text-brand-orange underline-offset-2 hover:underline"
+            onClick={() => { setSource(null); setTag(null); setQuery(''); }}
+          >
+            clear filters
+          </button>
         </p>
       )}
 
@@ -173,9 +188,29 @@ function ContactRow({ contact }: { contact: Contact }) {
           </Badge>
         ))}
       </div>
-      <Badge variant="outline" className="shrink-0 text-[10px]">
+      <Badge variant="outline" className="hidden shrink-0 text-[10px] sm:inline-flex">
         {SOURCE_LABEL[contact.source]}
       </Badge>
+      {contact.phone && (
+        <a
+          href={`tel:${contact.phone}`}
+          onClick={(e) => e.stopPropagation()}
+          title={`Call ${contact.phone}`}
+          className="shrink-0 rounded-full border p-2 text-brand-steel hover:bg-brand-orange/10 hover:text-brand-orange"
+        >
+          <Phone className="h-4 w-4" />
+        </a>
+      )}
+      {contact.email && (
+        <a
+          href={`mailto:${contact.email}`}
+          onClick={(e) => e.stopPropagation()}
+          title={`Email ${contact.email}`}
+          className="shrink-0 rounded-full border p-2 text-brand-steel hover:bg-brand-orange/10 hover:text-brand-orange"
+        >
+          <Mail className="h-4 w-4" />
+        </a>
+      )}
     </Link>
   );
 }

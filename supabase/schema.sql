@@ -263,6 +263,22 @@ begin
   end loop;
 end $$;
 
+-- ── contact files (Supabase Storage) ────────────────────────────────
+-- Private bucket "contact-files" (create in Dashboard → Storage or via API);
+-- paths are {contact_id}/{filename}. Team-gated via storage.objects policies:
+drop policy if exists "team files select" on storage.objects;
+create policy "team files select" on storage.objects
+  for select using (bucket_id = 'contact-files' and public.is_team_member());
+drop policy if exists "team files insert" on storage.objects;
+create policy "team files insert" on storage.objects
+  for insert with check (bucket_id = 'contact-files' and public.is_team_member());
+drop policy if exists "team files update" on storage.objects;
+create policy "team files update" on storage.objects
+  for update using (bucket_id = 'contact-files' and public.is_team_member());
+drop policy if exists "team files delete" on storage.objects;
+create policy "team files delete" on storage.objects
+  for delete using (bucket_id = 'contact-files' and public.is_team_member());
+
 -- daily keepalive target (see /api/keepalive.ts + vercel.json cron)
 create table if not exists public.heartbeat (
   id         int primary key default 1,

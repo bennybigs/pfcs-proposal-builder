@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { ContactDialog } from '@/components/crm/ContactDialog';
+import { ContactFiles } from '@/components/crm/ContactFiles';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
 import { useContactActivities, useLogActivity } from '@/lib/crm/api/activities';
@@ -76,6 +77,7 @@ export default function ContactDetail() {
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals]);
   const { data: proposalLinks = [] } = useDealProposalLinks(dealIds);
   const { create: createDeal } = useDealMutations();
+  const log = useLogActivity();
   const { remove: removeContact, update: updateContact } = useContactMutations();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -181,6 +183,19 @@ export default function ContactDetail() {
               ))}
             </div>
           </div>
+          {contact.email && (
+            <Button
+              variant="outline"
+              size="sm"
+              title="Opens a pre-addressed draft in your mail app (Outlook) — sends from your address, lands in your Sent folder"
+              onClick={() => {
+                log.mutate({ contact_id: contact.id, type: 'email', body: `Email drafted to ${contact.email}` });
+                window.location.href = `mailto:${contact.email}?subject=${encodeURIComponent(`PFCS — ${contact.name}`)}`;
+              }}
+            >
+              <Mail className="mr-1.5 h-3.5 w-3.5" /> Email
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>
@@ -257,6 +272,8 @@ export default function ContactDetail() {
           </div>
         </div>
       )}
+
+      <ContactFiles contactId={contact.id} />
 
       <div className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-brand-black">Timeline</h2>
