@@ -13,6 +13,7 @@ const SUBNAV = [
   { to: '/crm/pipeline', label: 'Pipeline' },
   { to: '/crm/tasks', label: 'Tasks' },
   { to: '/crm/reports', label: 'Reports' },
+  { to: '/crm/integrations', label: 'Integrations' },
   { to: '/crm/team', label: 'Team' },
 ];
 

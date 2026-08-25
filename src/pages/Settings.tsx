@@ -71,7 +71,7 @@ export default function Settings() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">Settings</h1>
+        <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">Proposal Settings</h1>
 
         <div className="space-y-6 rounded-lg bg-white p-6 shadow-sm">
           <section className="space-y-4">

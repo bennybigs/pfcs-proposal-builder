@@ -13,6 +13,7 @@ import Tasks from '@/pages/crm/Tasks';
 import Team from '@/pages/crm/Team';
 const Reports = lazy(() => import('@/pages/crm/Reports'));
 const InboundLeadsDoc = lazy(() => import('@/pages/crm/InboundLeadsDoc'));
+const Integrations = lazy(() => import('@/pages/crm/Integrations'));
 import { Toaster } from '@/components/ui/toast';
 
 export default function App() {
@@ -39,13 +40,23 @@ export default function App() {
             }
           />
           <Route
-            path="docs/inbound-leads"
+            path="integrations"
+            element={
+              <Suspense fallback={<p className="text-sm text-brand-steel">Loading…</p>}>
+                <Integrations />
+              </Suspense>
+            }
+          />
+          <Route
+            path="integrations/inbound-leads"
             element={
               <Suspense fallback={<p className="text-sm text-brand-steel">Loading…</p>}>
                 <InboundLeadsDoc />
               </Suspense>
             }
           />
+          {/* legacy path — printed links keep working */}
+          <Route path="docs/inbound-leads" element={<Navigate to="/crm/integrations/inbound-leads" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
