@@ -180,3 +180,14 @@ contact + deal; same email again with different segment → same contact, second
 (created_contact:false); no key → 401. All three calls in inbound_lead_log with key
 label. Docs for integrators: /crm/docs/inbound-leads (also docs/inbound-leads.md).
 Keys live in Vercel env INBOUND_API_KEYS as comma-separated label:secret pairs.
+
+## Cloud proposals
+
+1. Header shows a cloud badge on proposal pages: "Local only" signed out (links to sign-in),
+   "Team cloud" once signed in.
+2. Signed in, create or edit any proposal → it upserts to the `proposals` table within ~1s
+   (LWW on the proposal's updatedAt; deletes propagate; card library + company settings
+   sync as one shared document).
+3. VERIFIED cross-device: teammate A created a proposal; teammate B on a wiped browser
+   signed in and saw it on the dashboard immediately. Local storage remains the offline
+   cache; signed-out use is unchanged.
