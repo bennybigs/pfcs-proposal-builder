@@ -93,7 +93,8 @@ export default function Team() {
         )}
       </p>
 
-      <div className={iAmAdmin ? 'mt-4 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm' : 'hidden'}>
+      {iAmAdmin && (
+      <div className="mt-4 flex flex-wrap gap-2 rounded-lg border bg-white p-2 shadow-sm">
         <Input
           type="email"
           className="min-w-44 flex-1"
@@ -113,6 +114,7 @@ export default function Team() {
           <UserPlus className="mr-1.5 h-4 w-4" /> Add
         </Button>
       </div>
+      )}
 
       {isLoading ? (
         <p className="mt-6 text-sm text-brand-steel">Loading…</p>
