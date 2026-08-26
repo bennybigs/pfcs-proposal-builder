@@ -36,7 +36,10 @@ export default function Team() {
     if (!email.includes('@')) return;
     try {
       await add.mutateAsync({ email, name });
-      toast.success('Teammate added', 'Now set a starter password on their card.');
+      toast.success(
+        'Teammate added — no email was sent',
+        'Onboarding is by password, not invitation: open their card, set a starter password, then text it to them with the app link.'
+      );
       setSelectedEmail(email.trim().toLowerCase());
       setEmail('');
       setName('');
@@ -197,7 +200,10 @@ function MemberCard({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      {/* max-h + scroll: on phones this card is taller than the screen — without
+          this the Danger zone (and the remove confirmation) sit unreachable
+          below the fold, which reads as "the button does nothing". */}
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {member.display_name || member.email}
