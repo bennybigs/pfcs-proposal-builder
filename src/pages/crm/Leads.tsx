@@ -383,7 +383,12 @@ function LeadRow({
   return (
     <div className={cn('border-b px-4 py-3 last:border-b-0', holdDue && 'bg-amber-50')}>
       <div className="flex items-center gap-3">
-        <Link to={`/crm/contacts/${contact.id}`} className="min-w-0 flex-1 hover:opacity-80">
+        {/* leads with a deal open the ACTION screen (call/text/assign/won);
+            the full contact profile stays in the ⋯ menu */}
+        <Link
+          to={openDeal ? `/crm/pipeline?deal=${openDeal.id}` : `/crm/contacts/${contact.id}`}
+          className="min-w-0 flex-1 hover:opacity-80"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate font-medium text-brand-black">{contact.name}</span>
             <Badge variant="outline" className="text-[10px]">

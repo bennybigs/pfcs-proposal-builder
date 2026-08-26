@@ -33,6 +33,8 @@ import { ContactDialog } from '@/components/crm/ContactDialog';
 import { ContactFiles } from '@/components/crm/ContactFiles';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
+import { useTeam, memberName } from '@/lib/crm/api/team';
+import { useSessionEmail } from '@/components/crm/AuthGate';
 import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import { useContactActivities, useLogActivity } from '@/lib/crm/api/activities';
 import { useContactDeals, useDealMutations } from '@/lib/crm/api/deals';
@@ -81,7 +83,10 @@ export default function ContactDetail() {
   const { data: allTasks = [] } = useTasks();
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals]);
   const { data: proposalLinks = [] } = useDealProposalLinks(dealIds);
-  const { create: createDeal } = useDealMutations();
+  const { create: createDeal, assign } = useDealMutations();
+  const { data: team = [] } = useTeam();
+  const me = useSessionEmail();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const log = useLogActivity();
   const { remove: removeContact, update: updateContact } = useContactMutations();
   const [editOpen, setEditOpen] = useState(false);
@@ -244,20 +249,60 @@ export default function ContactDetail() {
             Deals {openDeals.length > 0 && <span className="text-brand-steel">({openDeals.length} open)</span>}
           </h2>
           <div className="mt-2 grid gap-2">
-            {deals.map((d) => (
-              <Link
-                key={d.id}
-                to={`/crm/pipeline?deal=${d.id}`}
-                className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-brand-gray-bg"
-              >
-                <span className="font-medium">{d.title}</span>
-                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', STAGE_META[d.stage].color)}>
-                  {STAGE_META[d.stage].label}
-                </span>
-                <Badge variant="secondary" className="text-[10px]">{SEGMENT_META[d.segment].short}</Badge>
-                <span className="ml-auto text-brand-steel">{formatDollars(d.value)}</span>
-              </Link>
-            ))}
+            {deals.map((d) => {
+              const isOpen = !['won', 'lost'].includes(d.stage);
+              return (
+                <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                  <Link
+                    to={`/crm/pipeline?deal=${d.id}`}
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-2 hover:opacity-80"
+                  >
+                    <span className="font-medium">{d.title}</span>
+                    <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', STAGE_META[d.stage].color)}>
+                      {STAGE_META[d.stage].label}
+                    </span>
+                    <Badge variant="secondary" className="text-[10px]">{SEGMENT_META[d.segment].short}</Badge>
+                    <span className="ml-auto text-brand-steel">{formatDollars(d.value)}</span>
+                  </Link>
+                  {iAmAdmin && isOpen ? (
+                    <select
+                      value={d.assigned_to ?? ''}
+                      disabled={assign.isPending}
+                      title="Who owns this deal"
+                      onChange={async (e) => {
+                        const toEmail = e.target.value || null;
+                        try {
+                          await assign.mutateAsync({
+                            deal: d,
+                            toEmail,
+                            assigneeName: memberName(team, toEmail),
+                            byName: memberName(team, me),
+                          });
+                          toast.success(toEmail ? `Assigned to ${memberName(team, toEmail)}` : 'Unassigned');
+                        } catch (err) {
+                          toast.error('Could not assign', err instanceof Error ? err.message : String(err));
+                        }
+                      }}
+                      className={cn(
+                        'h-7 shrink-0 cursor-pointer rounded-md border bg-white px-1.5 text-xs',
+                        d.assigned_to ? 'text-brand-black' : 'text-brand-steel'
+                      )}
+                    >
+                      <option value="">Assign to…</option>
+                      {team.map((t) => (
+                        <option key={t.email} value={t.email}>
+                          {t.display_name || t.email}
+                        </option>
+                      ))}
+                    </select>
+                  ) : d.assigned_to ? (
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {memberName(team, d.assigned_to)}
+                    </Badge>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
