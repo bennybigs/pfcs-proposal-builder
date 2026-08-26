@@ -341,20 +341,98 @@ drop policy if exists "team remove others" on public.team_members;
 create policy "team remove others" on public.team_members
   for delete using (public.is_team_admin() and email <> auth.email());
 
+-- ── role-aware visibility (2026-08-26, Ben's call) ──────────────────
+-- Admins see everything. Reps (non-admin members) see ONLY what pertains
+-- to them: deals assigned to them, contacts they created or that carry one
+-- of their deals, and the activities/tasks/links/history hanging off those.
+-- RLS is the source of truth — UI filters are convenience only.
+
+create or replace function public.can_see_deal(did uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_admin()
+      or exists (select 1 from public.deals d
+                   where d.id = did and d.assigned_to = auth.email());
+$$;
+
+create or replace function public.can_see_contact(cid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_admin()
+      or exists (select 1 from public.contacts c
+                   where c.id = cid and c.owner = auth.uid())
+      or exists (select 1 from public.deals d
+                   where d.contact_id = cid and d.assigned_to = auth.email());
+$$;
+
 do $$
 declare t text;
 begin
+  -- clear the old team-wide policies wherever they exist
   foreach t in array array['contacts', 'deals', 'activities', 'tasks', 'proposal_links'] loop
     execute format('drop policy if exists "team select" on public.%I', t);
-    execute format('create policy "team select" on public.%I for select using (public.is_team_member())', t);
     execute format('drop policy if exists "team insert" on public.%I', t);
-    execute format('create policy "team insert" on public.%I for insert with check (public.is_team_member())', t);
     execute format('drop policy if exists "team update" on public.%I', t);
-    execute format('create policy "team update" on public.%I for update using (public.is_team_member()) with check (public.is_team_member())', t);
     execute format('drop policy if exists "team delete" on public.%I', t);
-    execute format('create policy "team delete" on public.%I for delete using (public.is_team_member())', t);
   end loop;
 end $$;
+
+-- deals: reps only their own; they cannot assign to anyone but themselves
+drop policy if exists "role select" on public.deals;
+create policy "role select" on public.deals for select
+  using (public.is_team_member() and (public.is_team_admin() or assigned_to = auth.email()));
+drop policy if exists "role insert" on public.deals;
+create policy "role insert" on public.deals for insert
+  with check (public.is_team_member() and (public.is_team_admin() or assigned_to = auth.email()));
+drop policy if exists "role update" on public.deals;
+create policy "role update" on public.deals for update
+  using (public.is_team_member() and (public.is_team_admin() or assigned_to = auth.email()))
+  with check (public.is_team_admin() or assigned_to = auth.email());
+drop policy if exists "role delete" on public.deals;
+create policy "role delete" on public.deals for delete
+  using (public.is_team_member() and (public.is_team_admin() or assigned_to = auth.email()));
+
+-- contacts: reps see what they created (owner) or what carries their deal;
+-- any member may create (owner stamps them as visible to themselves)
+drop policy if exists "role select" on public.contacts;
+create policy "role select" on public.contacts for select
+  using (public.is_team_member() and public.can_see_contact(id));
+drop policy if exists "role insert" on public.contacts;
+create policy "role insert" on public.contacts for insert
+  with check (public.is_team_member());
+drop policy if exists "role update" on public.contacts;
+create policy "role update" on public.contacts for update
+  using (public.is_team_member() and public.can_see_contact(id))
+  with check (public.is_team_member() and public.can_see_contact(id));
+drop policy if exists "role delete" on public.contacts;
+create policy "role delete" on public.contacts for delete
+  using (public.is_team_member() and public.can_see_contact(id));
+
+-- activities ride their contact's visibility (contact_id is NOT NULL)
+drop policy if exists "role all" on public.activities;
+create policy "role all" on public.activities for all
+  using (public.is_team_member() and public.can_see_contact(contact_id))
+  with check (public.is_team_member() and public.can_see_contact(contact_id));
+
+-- tasks: visible via their contact OR their deal
+drop policy if exists "role all" on public.tasks;
+create policy "role all" on public.tasks for all
+  using (public.is_team_member() and (
+    (contact_id is not null and public.can_see_contact(contact_id))
+    or (deal_id is not null and public.can_see_deal(deal_id))))
+  with check (public.is_team_member() and (
+    (contact_id is not null and public.can_see_contact(contact_id))
+    or (deal_id is not null and public.can_see_deal(deal_id))));
+
+-- proposal_links ride their deal
+drop policy if exists "role all" on public.proposal_links;
+create policy "role all" on public.proposal_links for all
+  using (public.is_team_member() and public.can_see_deal(deal_id))
+  with check (public.is_team_member() and public.can_see_deal(deal_id));
+
+-- stage history: read-only, rides its deal (trigger writes with definer rights)
+drop policy if exists "team select" on public.deal_stage_history;
+drop policy if exists "role select" on public.deal_stage_history;
+create policy "role select" on public.deal_stage_history for select
+  using (public.is_team_member() and public.can_see_deal(deal_id));
 
 -- heartbeat: no client policies at all — only the service-role keepalive
 -- touches it (service role bypasses RLS).

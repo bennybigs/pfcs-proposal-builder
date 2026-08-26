@@ -4,7 +4,7 @@
 // leaves the funnel (Move to contacts), or gets disqualified with a reason.
 // Speed-to-first-call is the point — every row wears its age.
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -116,6 +116,9 @@ export default function Leads() {
         .sort((a, b) => b.created_at.localeCompare(a.created_at)),
     [deals, contactById]
   );
+
+  // the shared triage inbox is admin territory — reps live in My Leads
+  if (team.length > 0 && me && !iAmAdmin) return <Navigate to="/crm/my" replace />;
 
   return (
     <div className="pb-20 sm:pb-0">

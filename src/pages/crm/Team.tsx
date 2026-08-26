@@ -80,13 +80,16 @@ export default function Team() {
     }
   };
 
+  // reps see only themselves — the roster is admin territory
+  const visibleTeam = iAmAdmin ? team : team.filter((m) => m.email === myEmail);
+
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="text-xl font-bold text-brand-black">Team</h1>
+      <h1 className="text-xl font-bold text-brand-black">{iAmAdmin ? 'Team' : 'My account'}</h1>
       <p className="mt-1 text-sm text-brand-steel">
         {iAmAdmin
           ? 'Tap anyone to manage them — name, admin rights, password, removal. To onboard someone: add their email, set a starter password on their card, then text them the link and password.'
-          : 'Everyone listed here can use the CRM. Tap your own row to change your password; admins (shield) handle everything else.'}
+          : 'Tap your row to change your password or notification settings.'}
       </p>
 
       {iAmAdmin && (
@@ -116,7 +119,7 @@ export default function Team() {
         <p className="mt-6 text-sm text-brand-steel">Loading…</p>
       ) : (
         <div className="mt-4 overflow-hidden rounded-lg border bg-white shadow-sm">
-          {team.map((m) => (
+          {visibleTeam.map((m) => (
             <button
               key={m.email}
               onClick={() => setSelectedEmail(m.email)}

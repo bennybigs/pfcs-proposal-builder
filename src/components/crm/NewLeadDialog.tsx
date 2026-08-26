@@ -122,6 +122,9 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
           .eq('id', contact.id)
           .in('lead_status', ['none', 'disqualified']);
       } else {
+        // owner stamp: under rep RLS you can only read back contacts you
+        // created or that carry your deal — owner covers the moment between
+        const userId = (await sb().auth.getUser()).data.user?.id ?? null;
         const { data, error } = await sb()
           .from('contacts')
           .insert({
@@ -132,6 +135,7 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
             source: form.source,
             source_detail: form.source_detail.replace(/\s+/g, ' ').trim() || null,
             lead_status: 'new',
+            owner: userId,
           })
           .select()
           .single();

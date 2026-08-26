@@ -172,12 +172,14 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
     if (!picked) return;
     setBusy(true);
     try {
+      const email = (await supabase!.auth.getUser()).data.user?.email ?? null;
       const { data, error } = await supabase!
         .from('deals')
         .insert({
           contact_id: picked.id,
           title: proposal.project.referenceName || `${picked.name} — new project`,
           segment: 'other',
+          assigned_to: email, // you create it, you own it (RLS requires this for reps)
         })
         .select()
         .single();

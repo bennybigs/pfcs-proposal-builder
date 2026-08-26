@@ -300,3 +300,27 @@ records 'failed' without crashing; a recipient with no devices records
 phone test is yours: enable push on your phone, then create a test lead
 assigned to yourself from another browser — your phone should buzz within
 seconds (assignments trigger an immediate flush).
+
+## Rep visibility walls (2026-08-26)
+
+Reps (non-admin members) are now walled off at the DATABASE level — the UI hides
+things, but RLS is the enforcement: a rep with API tools still gets zero rows.
+
+- Reps see only: deals assigned to them, contacts they created or that carry one
+  of their deals, and the activities/tasks/proposal-links/stage-history on those.
+- Reps cannot: see unassigned deals, reassign a deal (even their own — new value
+  must stay themselves), create a deal they don't own, or see anyone else's data.
+- Admins see everything; Reports (admin-only) still totals every rep via closed_by.
+- Nav for reps: My Leads · Contacts · Pipeline · Tasks (+ bell). Leads inbox,
+  Reports, Integrations, Team are admin-only; /crm/team for a rep shows only
+  "My account" (own password + notification toggle); /crm/leads redirects to My Leads.
+- Creating a deal now self-assigns by default everywhere (you create it, you own
+  it); admins can still explicitly leave New-Lead deals unassigned for the queue.
+
+Adversarially verified with a throwaway rep account (since deleted): own-deal-only
+select ✓, cross-rep edit = 0 rows ✓, reassign-away = 403 ✓, unassigned create =
+403 ✓, flip to admin = full visibility ✓. Your live test: sign in as the "test"
+(stahlcontracting) account — it's a rep.
+
+Known boundary, deliberate: the PROPOSAL DOCUMENT library (builder) is still
+team-wide — proposals aren't assignment-aware yet. Say the word to scope those too.

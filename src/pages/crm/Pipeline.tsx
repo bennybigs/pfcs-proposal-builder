@@ -30,6 +30,7 @@ import { DealDrawer } from '@/components/crm/DealDrawer';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTeam, memberName } from '@/lib/crm/api/team';
+import { useSessionEmail } from '@/lib/crm/session';
 import { useRecentActivities } from '@/lib/crm/api/activities';
 import { useTasks } from '@/lib/crm/api/tasks';
 import { goneQuietDealIds } from '@/lib/crm/health';
@@ -57,6 +58,8 @@ export default function Pipeline() {
   const [dragging, setDragging] = useState<Deal | null>(null);
   const [segment, setSegment] = useState<DealSegment | null>(null);
   const { data: team = [] } = useTeam();
+  const me = useSessionEmail();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   // '' = everyone, '__unassigned__' = nobody, else a member email
   const [assignee, setAssignee] = useState('');
 
@@ -141,7 +144,7 @@ export default function Pipeline() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-brand-black">Pipeline</h1>
         <div className="flex-1" />
-        {team.length > 1 && (
+        {iAmAdmin && team.length > 1 && (
           <select
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}

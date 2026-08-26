@@ -8,19 +8,22 @@ import { AuthGate, useSessionEmail } from '@/components/crm/AuthGate';
 import { NotificationBell } from '@/components/crm/NotificationBell';
 import { PushBanner } from '@/components/crm/PushBanner';
 import { useNotifications } from '@/lib/crm/api/notifications';
+import { useTeam } from '@/lib/crm/api/team';
 import { supabase } from '@/lib/supabase';
 import { useLeadBadge } from '@/lib/crm/leadBadge';
 import { cn } from '@/lib/utils';
 
+// adminOnly entries vanish for reps — they see only what pertains to them
+// (matching the RLS: their deals, their contacts, their tasks)
 const SUBNAV = [
-  { to: '/crm/leads', label: 'Leads' },
-  { to: '/crm/my', label: 'My Leads' },
-  { to: '/crm', label: 'Contacts' },
-  { to: '/crm/pipeline', label: 'Pipeline' },
-  { to: '/crm/tasks', label: 'Tasks' },
-  { to: '/crm/reports', label: 'Reports' },
-  { to: '/crm/integrations', label: 'Integrations' },
-  { to: '/crm/team', label: 'Team' },
+  { to: '/crm/leads', label: 'Leads', adminOnly: true },
+  { to: '/crm/my', label: 'My Leads', adminOnly: false },
+  { to: '/crm', label: 'Contacts', adminOnly: false },
+  { to: '/crm/pipeline', label: 'Pipeline', adminOnly: false },
+  { to: '/crm/tasks', label: 'Tasks', adminOnly: false },
+  { to: '/crm/reports', label: 'Reports', adminOnly: true },
+  { to: '/crm/integrations', label: 'Integrations', adminOnly: true },
+  { to: '/crm/team', label: 'Team', adminOnly: true },
 ];
 
 // One client for the CRM's server cache. Zustand remains the UI state store —
@@ -45,13 +48,17 @@ function CrmShell() {
   const leadCount = useLeadBadge((s) => s.count);
   const { data: notifications = [] } = useNotifications();
   const unreadAssigned = notifications.filter((n) => !n.read_at && n.type === 'deal_assigned').length;
+  const me = useSessionEmail();
+  const { data: team = [] } = useTeam();
+  const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
+  const nav = SUBNAV.filter((item) => iAmAdmin || !item.adminOnly);
   return (
     <div className="min-h-screen bg-brand-gray-bg">
       <AppHeader />
       <div className="border-b bg-white">
         <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-2">
           <SessionBadge />
-          {SUBNAV.map((item) => {
+          {nav.map((item) => {
             const active =
               item.to === '/crm'
                 ? pathname === '/crm' || pathname.startsWith('/crm/contacts')
