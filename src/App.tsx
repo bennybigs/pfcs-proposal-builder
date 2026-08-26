@@ -16,6 +16,7 @@ const Reports = lazy(() => import('@/pages/crm/Reports'));
 const InboundLeadsDoc = lazy(() => import('@/pages/crm/InboundLeadsDoc'));
 const Integrations = lazy(() => import('@/pages/crm/Integrations'));
 import { Toaster } from '@/components/ui/toast';
+import { BuilderGate } from '@/components/layout/BuilderGate';
 import { useBuilderCloudSync } from '@/lib/builderSync';
 
 function BuilderSync() {
@@ -28,11 +29,12 @@ export default function App() {
     <BrowserRouter>
       <BuilderSync />
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/proposal/:id" element={<Editor />} />
+        <Route path="/" element={<BuilderGate><Dashboard /></BuilderGate>} />
+        <Route path="/proposal/:id" element={<BuilderGate><Editor /></BuilderGate>} />
+        {/* customer share links stay open — no account, no gate */}
         <Route path="/view" element={<CustomerView />} />
-        <Route path="/library" element={<LibraryEditor />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/library" element={<BuilderGate><LibraryEditor /></BuilderGate>} />
+        <Route path="/settings" element={<BuilderGate><Settings /></BuilderGate>} />
         <Route path="/crm" element={<CrmLayout />}>
           <Route index element={<CrmHome />} />
           <Route path="leads" element={<Leads />} />
