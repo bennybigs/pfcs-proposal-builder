@@ -53,14 +53,9 @@ export default function LibraryEditor() {
     <div className="min-h-screen">
       <AppHeader
         right={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setConfirmReset(true)}>
-              <RotateCcw className="h-4 w-4" /> Reset to defaults
-            </Button>
-            <Button size="sm" onClick={handleNew}>
-              <Plus className="h-4 w-4" /> New Template
-            </Button>
-          </div>
+          <Button size="sm" onClick={handleNew} title="New template">
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Template</span>
+          </Button>
         }
       />
 
@@ -102,6 +97,20 @@ export default function LibraryEditor() {
                 </div>
               );
             })}
+          </div>
+
+          {/* destructive, rare — lives at the BOTTOM, never in the header */}
+          <div className="mt-8 border-t pt-4">
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="flex items-center gap-1.5 text-xs text-brand-steel hover:text-red-600"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reset library to defaults…
+            </button>
+            <p className="mt-1 text-[11px] text-brand-steel/70">
+              Replaces every template with the original PFCS set. Custom templates are lost;
+              existing proposals are not touched.
+            </p>
           </div>
         </aside>
 
