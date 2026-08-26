@@ -10,12 +10,18 @@ import { InstallAppButton } from '@/components/layout/InstallAppButton';
 /** Cloud badge for proposal documents: synced / signed-out / error. */
 function SyncBadge() {
   const status = useBuilderSyncStatus((s) => s.status);
+  const { pathname } = useLocation();
   if (status === 'off') return null;
   if (status === 'signedOut')
     return (
-      <Link to="/crm" title="Sign in (CRM) so proposals save to the team cloud, not just this browser"
-        className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-brand-steel hover:bg-brand-gray-bg">
-        <CloudOff className="h-3.5 w-3.5" /> <span className="hidden md:inline">Local only</span>
+      // A real Sign in button, right where you are — lands on the sign-in
+      // card and comes straight back here afterward (?next=).
+      <Link
+        to={`/crm?next=${encodeURIComponent(pathname)}`}
+        title="Sign in so proposals save to the team cloud and the CRM unlocks"
+        className="flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:brightness-95"
+      >
+        <CloudOff className="h-3.5 w-3.5" /> Sign in
       </Link>
     );
   const looks = {
@@ -55,10 +61,10 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
   useEffect(() => startLeadBadge(), []);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logoUrl} alt="PFCS" className="h-12 max-w-[270px] object-contain" />
+            <img src={logoUrl} alt="PFCS" className="h-[72px] max-w-[400px] object-contain" />
           </Link>
           <nav className="flex items-center gap-1">
             {NAV.map((item) => (

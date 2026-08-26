@@ -2,6 +2,7 @@
 // team_members table (RLS) — an authenticated stranger reads nothing, and we
 // show them a "not on the team" screen instead of empty lists.
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,19 @@ export function useSessionEmail(): string {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [team, setTeam] = useState<TeamState>('checking');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // "Sign in" buttons elsewhere in the app link to /crm?next=<where-I-was>;
+  // once the gate opens, send the person back there instead of stranding
+  // them in the CRM.
+  useEffect(() => {
+    if (!session || team !== 'member') return;
+    const next = new URLSearchParams(location.search).get('next');
+    if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/crm')) {
+      navigate(next, { replace: true });
+    }
+  }, [session, team, location.search, navigate]);
 
   useEffect(() => {
     if (!supabase) return;
