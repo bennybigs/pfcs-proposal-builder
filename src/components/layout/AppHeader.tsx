@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useBuilderSyncStatus } from '@/lib/builderSync';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
-import { InstallAppButton } from '@/components/layout/InstallAppButton';
 
 /** Cloud badge for proposal documents: synced / signed-out / error. */
 function SyncBadge() {
@@ -61,10 +60,14 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
   useEffect(() => startLeadBadge(), []);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
-      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={logoUrl} alt="PFCS" className="h-[72px] max-w-[400px] object-contain" />
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-6">
+          <Link to="/" className="flex shrink-0 items-center gap-2">
+            <img
+              src={logoUrl}
+              alt="PFCS"
+              className="h-12 max-w-[96px] object-contain sm:h-[72px] sm:max-w-[400px]"
+            />
           </Link>
           <nav className="flex items-center gap-1">
             {NAV.map((item) => (
@@ -93,9 +96,8 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <SyncBadge />
-          <InstallAppButton />
           {right}
         </div>
       </div>

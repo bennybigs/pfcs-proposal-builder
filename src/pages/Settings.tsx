@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { InstallAppButton } from '@/components/layout/InstallAppButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -203,6 +204,20 @@ export default function Settings() {
               </span>
               .
             </p>
+          </section>
+
+          <Separator />
+
+          <section className="space-y-4">
+            <h2 className="font-heading text-lg font-bold uppercase tracking-wide text-brand-orange">
+              Install as an App
+            </h2>
+            <p className="text-sm text-brand-steel">
+              One-time, per device: installs PFCS on the desktop or home screen so it opens like a
+              real app (and on phones, enables lock-screen notifications). Each teammate does this
+              once — the invitation email walks them through the phone steps.
+            </p>
+            <InstallAppButton />
           </section>
 
           <Separator />

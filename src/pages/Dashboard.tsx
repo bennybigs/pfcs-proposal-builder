@@ -138,32 +138,35 @@ export default function Dashboard() {
     <div className="min-h-screen">
       <AppHeader
         right={
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleImportFile(f);
-                e.target.value = '';
-              }}
-            />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <FileUp className="h-4 w-4" /> Import JSON
-            </Button>
-            <Button size="sm" onClick={() => setPickerOpen(true)}>
-              <Plus className="h-4 w-4" /> New Proposal
-            </Button>
-          </div>
+          <Button size="sm" onClick={() => setPickerOpen(true)} title="New proposal">
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Proposal</span>
+          </Button>
         }
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">
-          Proposals
-        </h1>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleImportFile(f);
+            e.target.value = '';
+          }}
+        />
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-wide">Proposals</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Restore a proposal from a JSON backup file (Export → Proposal JSON in the editor)"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <FileUp className="h-4 w-4" /> <span className="hidden sm:inline">Import backup</span>
+          </Button>
+        </div>
 
         {list.length === 0 && contracts.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-brand-gray-light bg-white p-16 text-center">
