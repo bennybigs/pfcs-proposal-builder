@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { AuthGate, useSessionEmail } from '@/components/crm/AuthGate';
 import { NotificationBell } from '@/components/crm/NotificationBell';
+import { PushBanner } from '@/components/crm/PushBanner';
 import { useNotifications } from '@/lib/crm/api/notifications';
 import { supabase } from '@/lib/supabase';
 import { useLeadBadge } from '@/lib/crm/leadBadge';
@@ -82,6 +83,7 @@ function CrmShell() {
           })}
         </nav>
       </div>
+      <PushBanner />
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

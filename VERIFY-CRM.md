@@ -270,3 +270,33 @@ self-assign skipped, won → closed_by snapshot, reassign-after-win immutable, A
 → both admins notified); inbound curl → 201 + notifications + created_via=api;
 flush without token → 503, queue intact. Signed-in click-through is yours: assign a
 deal to Shawn → his bell badges within a minute and the timeline logs it.
+
+## Push notifications (lock-screen alerts)
+
+Free web push — no Twilio, no phone numbers. When a lead comes in or a deal is
+assigned, every device the recipient enabled gets a lock-screen notification;
+tapping it opens the app straight to the deal.
+
+How each person turns it on (one time, per device):
+
+- **Android / desktop Chrome or Edge**: open the CRM → an orange banner under the
+  nav says "Get a buzz on this device…" → tap **Enable notifications** → Allow.
+- **iPhone / iPad**: install the app first (Share → **Add to Home Screen**, or the
+  Install App button), then open the INSTALLED app → same banner → Enable → Allow.
+  (Apple only allows web push inside installed apps, iOS 16.4+.)
+
+Behavior:
+- Assignment → the assignee's devices buzz (not the person doing the assigning).
+- Inbound API lead → every admin's devices buzz ("New inbound lead — unassigned").
+- Tap → opens /crm/pipeline at that exact deal.
+- Every send attempt logs to notification_deliveries (channel 'push'); dead
+  devices (uninstalled app) are cleaned up automatically on send.
+- Push works INDEPENDENTLY of email — it's live now, while email still waits on
+  the Postmark token.
+
+Verified on prod 2026-08-26: flush sends per-channel; a broken subscription
+records 'failed' without crashing; a recipient with no devices records
+'skipped_no_subscription'; email stays queued ('not-configured'). The real
+phone test is yours: enable push on your phone, then create a test lead
+assigned to yourself from another browser — your phone should buzz within
+seconds (assignments trigger an immediate flush).

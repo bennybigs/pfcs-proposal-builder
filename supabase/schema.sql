@@ -511,6 +511,34 @@ drop trigger if exists deals_notify_inbound on public.deals;
 create trigger deals_notify_inbound after insert on public.deals
   for each row execute function public.notify_inbound_lead();
 
+-- Web-push subscriptions: one row per member device. The browser hands us an
+-- endpoint + keys when the member taps "Enable"; /api/notify-flush pushes to
+-- every device a recipient has. Dead endpoints (410/404) get deleted on send.
+create table if not exists public.push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_email text not null references public.team_members (email) on update cascade on delete cascade,
+  endpoint   text not null unique,
+  p256dh     text not null,
+  auth       text not null,
+  user_agent text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subs_user_idx on public.push_subscriptions (user_email);
+
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "own select" on public.push_subscriptions;
+create policy "own select" on public.push_subscriptions
+  for select using (user_email = auth.email());
+drop policy if exists "own insert" on public.push_subscriptions;
+create policy "own insert" on public.push_subscriptions
+  for insert with check (user_email = auth.email());
+drop policy if exists "own update" on public.push_subscriptions;
+create policy "own update" on public.push_subscriptions
+  for update using (user_email = auth.email()) with check (user_email = auth.email());
+drop policy if exists "own delete" on public.push_subscriptions;
+create policy "own delete" on public.push_subscriptions
+  for delete using (user_email = auth.email());
+
 -- reporting views grow the assignment columns (drop first: create-or-replace
 -- cannot add columns mid-view; the grant below restores read access)
 drop view if exists public.report_deals;
