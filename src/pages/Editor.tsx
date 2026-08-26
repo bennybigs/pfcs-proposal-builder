@@ -31,6 +31,7 @@ import { toast } from '@/components/ui/toast';
 import { cardFromTemplate, useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
+import { SendProposalDialog } from '@/components/editor/SendProposalDialog';
 import { cardPdfFilename, exportElementToPdf } from '@/lib/pdfExport';
 import { logProposalEvent } from '@/lib/crm/integration/proposalEvents';
 import { CrmLinkControl } from '@/components/crm/CrmLinkControl';
@@ -65,6 +66,7 @@ export default function Editor() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [signedBanner, setSignedBanner] = useState<string | null>(null);
   const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const cardPdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -251,7 +253,7 @@ export default function Editor() {
           downloadTextFile(`${proposal.proposalNumber}-customer.csv`, generateCustomerCsv(proposal))
         }
         onExportJson={handleExportJson}
-        onSend={handleSend}
+        onSend={() => setSendOpen(true)}
         onDelete={() => {
           deleteProposal(proposal.id);
           navigate('/');
@@ -456,6 +458,16 @@ export default function Editor() {
           </aside>
         </div>
       </DndContext>
+
+      <SendProposalDialog
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        proposal={proposal}
+        settings={settings}
+        buildUrl={() => buildShareUrl(proposal, settings)}
+        onMailApp={handleSend}
+        afterSent={(url) => afterSent('share', url)}
+      />
 
       {/* Share link fallback — shown only when the browser blocks clipboard access */}
       <Dialog
