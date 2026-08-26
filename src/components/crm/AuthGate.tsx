@@ -111,14 +111,26 @@ function SignIn() {
 
   const emailOk = email.includes('@');
 
+  // Installed-PWA hardening: supabase-js auth calls can hang on a stuck
+  // internal lock (seen on iOS standalone). Never let the button freeze —
+  // time out, tell the user, and let them retry.
+  const withTimeout = async <T,>(p: Promise<T>, ms = 15_000): Promise<T | 'timeout'> =>
+    Promise.race([p, new Promise<'timeout'>((resolve) => window.setTimeout(() => resolve('timeout'), ms))]);
+
   const signIn = async () => {
     setBusy(true);
     setError('');
-    const { error: err } = await supabase!.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    const result = await withTimeout(
+      supabase!.auth.signInWithPassword({ email: email.trim(), password })
+    );
     setBusy(false);
+    if (result === 'timeout') {
+      setError(
+        'Sign-in is taking too long. Fully close this app (swipe it away), reopen it, and try again — that clears a stuck connection.'
+      );
+      return;
+    }
+    const err = result.error;
     if (err) {
       setError(
         /invalid login credentials/i.test(err.message)
@@ -132,12 +144,18 @@ function SignIn() {
   const sendLink = async () => {
     setBusy(true);
     setError('');
-    const { error: err } = await supabase!.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/crm` },
-    });
+    const result = await withTimeout(
+      supabase!.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: `${window.location.origin}/crm` },
+      })
+    );
     setBusy(false);
-    if (err) setError(err.message);
+    if (result === 'timeout') {
+      setError('Took too long — fully close the app, reopen, and try again.');
+      return;
+    }
+    if (result.error) setError(result.error.message);
     else setSent(true);
   };
 
