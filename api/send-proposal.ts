@@ -71,7 +71,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (viewIdx < 0) return res.status(400).json({ error: 'Invalid share link.' });
   const shareUrl = `${CANONICAL_ORIGIN}${shareUrlRaw.slice(viewIdx)}`;
 
-  const from = process.env.SIGN_FROM_EMAIL || 'ben@mcsi.work';
+  // Send AS the project manager when their address is a verified Postmark
+  // sender (VERIFIED_SENDERS env, comma-separated). Otherwise send from the
+  // default address with Reply-To the PM — replies reach them either way.
+  const defaultFrom = process.env.SIGN_FROM_EMAIL || 'ben@mcsi.work';
+  const verifiedSenders = (process.env.VERIFIED_SENDERS ?? defaultFrom)
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const sendAsPm = isEmail(replyTo) && verifiedSenders.includes(replyTo);
+  const from = sendAsPm ? replyTo : defaultFrom;
+  const fromDisplay = sendAsPm && pmName ? `${pmName} — ${companyName}` : companyName;
   const greeting = customerName ? `Hello ${customerName},` : 'Hello,';
   const signoffName = pmName || companyName;
 
@@ -114,9 +124,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'X-Postmark-Server-Token': token,
       },
       body: JSON.stringify({
-        From: `${companyName} <${from}>`,
+        From: `${fromDisplay} <${from}>`,
         To: to,
-        ...(isEmail(replyTo) ? { ReplyTo: replyTo } : {}),
+        ...(isEmail(replyTo) && !sendAsPm ? { ReplyTo: replyTo } : {}),
         Subject: subject,
         TextBody: text,
         HtmlBody: html,
