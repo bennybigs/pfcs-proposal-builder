@@ -1,9 +1,19 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Cloud, CloudOff } from 'lucide-react';
+import { Briefcase, Cloud, CloudOff, LogOut, Settings, Users } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useBuilderSyncStatus } from '@/lib/builderSync';
+import { useSessionEmail } from '@/lib/crm/session';
+import { supabase } from '@/lib/supabase';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
 
 /** Cloud badge for proposal documents: synced / signed-out / error. */
@@ -34,6 +44,61 @@ function SyncBadge() {
       className={cn('flex items-center gap-1 px-2 py-1 text-xs', l.cls)}>
       <Cloud className="h-3.5 w-3.5" /> <span className="hidden md:inline">{l.label}</span>
     </span>
+  );
+}
+
+/**
+ * Signed in → initials avatar with the usuals (who am I, shortcuts, sign
+ * out). Signed out the SyncBadge shows the Sign in button instead, so the
+ * top-right corner always answers "who am I / how do I switch".
+ */
+function ProfileButton() {
+  const email = useSessionEmail();
+  if (!supabase || !email) return null;
+  const initials = email.slice(0, 2).toUpperCase();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          title={`Signed in as ${email}`}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-orange text-sm font-bold text-white hover:brightness-95"
+        >
+          {initials}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="font-normal">
+          <div className="text-xs text-brand-steel">Signed in as</div>
+          <div className="truncate text-sm font-medium text-brand-black">{email}</div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/crm/my">
+            <Briefcase className="mr-2 h-4 w-4" /> My Leads
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/crm/team">
+            <Users className="mr-2 h-4 w-4" /> Team &amp; notifications
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/settings">
+            <Settings className="mr-2 h-4 w-4" /> Proposal Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-red-600"
+          onClick={async () => {
+            await supabase!.auth.signOut();
+            window.location.assign('/');
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -99,6 +164,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
         <div className="flex shrink-0 items-center gap-2">
           <SyncBadge />
           {right}
+          <ProfileButton />
         </div>
       </div>
       {PROPOSAL_ROUTES.includes(pathname) && (

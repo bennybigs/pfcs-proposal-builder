@@ -11,14 +11,7 @@ import { AppHeader } from '@/components/layout/AppHeader';
 
 type TeamState = 'checking' | 'member' | 'outsider';
 
-export function useSessionEmail(): string {
-  const [email, setEmail] = useState('');
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? ''));
-  }, []);
-  return email;
-}
+export { useSessionEmail } from '@/lib/crm/session';
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);

@@ -91,22 +91,12 @@ function CrmShell() {
   );
 }
 
-/** Who am I + bell + one-tap sign out — right edge of the CRM sub-nav. */
+/** The bell, pinned to the right edge of the CRM sub-nav. Who-am-I and
+ *  sign-out live in the header's profile button now. */
 function SessionBadge() {
-  const email = useSessionEmail();
   return (
-    <span className="order-last ml-auto flex items-center gap-2 text-xs text-brand-steel">
+    <span className="order-last ml-auto flex items-center">
       <NotificationBell />
-      <span className="hidden max-w-48 truncate sm:inline" title={email}>{email}</span>
-      <button
-        className="rounded-md border px-2 py-1 font-medium hover:bg-brand-gray-bg"
-        onClick={async () => {
-          await supabase?.auth.signOut();
-          window.location.assign('/crm');
-        }}
-      >
-        Sign out
-      </button>
     </span>
   );
 }
