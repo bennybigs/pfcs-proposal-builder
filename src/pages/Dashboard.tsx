@@ -164,7 +164,7 @@ export default function Dashboard() {
             title="Restore a proposal from a JSON backup file (Export → Proposal JSON in the editor)"
             onClick={() => fileInputRef.current?.click()}
           >
-            <FileUp className="h-4 w-4" /> <span className="hidden sm:inline">Import backup</span>
+            <FileUp className="h-4 w-4" /> Import backup
           </Button>
         </div>
 
