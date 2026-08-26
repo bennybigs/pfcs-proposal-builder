@@ -3,7 +3,7 @@
 // fills in linking; the section renders whatever proposal_links exist).
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ExternalLink, FileText, RefreshCw, Trophy, X } from 'lucide-react';
+import { ExternalLink, FileText, Mail, MessageSquare, Phone, RefreshCw, Trophy, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -160,6 +160,49 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             </span>
           )}
         </div>
+
+        {/* one-touch outreach — each tap also logs the activity (and a new
+            lead auto-moves to Contacted through the normal lifecycle) */}
+        {contact && (contact.phone || contact.email) && (
+          <div className="mt-3 flex gap-2">
+            {contact.phone && (
+              <Button asChild size="sm" variant="outline" className="flex-1">
+                <a
+                  href={`tel:${contact.phone}`}
+                  onClick={() =>
+                    log.mutate({ contact_id: contact.id, deal_id: deal.id, type: 'call', body: `Called ${contact.phone}` })
+                  }
+                >
+                  <Phone className="mr-1.5 h-4 w-4" /> Call
+                </a>
+              </Button>
+            )}
+            {contact.phone && (
+              <Button asChild size="sm" variant="outline" className="flex-1">
+                <a
+                  href={`sms:${contact.phone}`}
+                  onClick={() =>
+                    log.mutate({ contact_id: contact.id, deal_id: deal.id, type: 'text', body: `Texted ${contact.phone}` })
+                  }
+                >
+                  <MessageSquare className="mr-1.5 h-4 w-4" /> Text
+                </a>
+              </Button>
+            )}
+            {contact.email && (
+              <Button asChild size="sm" variant="outline" className="flex-1">
+                <a
+                  href={`mailto:${contact.email}`}
+                  onClick={() =>
+                    log.mutate({ contact_id: contact.id, deal_id: deal.id, type: 'email', body: `Emailed ${contact.email}` })
+                  }
+                >
+                  <Mail className="mr-1.5 h-4 w-4" /> Email
+                </a>
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid gap-3">
           <Field label="Title">

@@ -37,12 +37,20 @@ import {
 import { toast } from '@/components/ui/toast';
 import { NewLeadDialog } from '@/components/crm/NewLeadDialog';
 import { useSessionEmail } from '@/components/crm/AuthGate';
+import { sb } from '@/lib/supabase';
 import { useContacts, useContactMutations, setLeadStatus } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTeam, memberName, type TeamMember } from '@/lib/crm/api/team';
 import { useLogActivity, logActivity } from '@/lib/crm/api/activities';
 import { useLeadBadge, refreshLeadBadge } from '@/lib/crm/leadBadge';
-import { LEAD_STATUS_META, SOURCE_LABEL, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
+import {
+  LEAD_INBOX_STATUSES,
+  LEAD_STATUS_META,
+  SOURCE_LABEL,
+  formatDollars,
+  type Contact,
+  type Deal,
+} from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -95,15 +103,16 @@ export default function Leads() {
   const total = fresh.length + inProgress.length + onHold.length;
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
+  // Deals with no owner whose contact has LEFT the lead inbox — leads still in
+  // the inbox get assigned right on their own row above, not listed twice.
   const unassigned = useMemo(
     () =>
       deals
-        .filter(
-          (d) =>
-            !d.assigned_to &&
-            !['won', 'lost'].includes(d.stage) &&
-            !contactById.get(d.contact_id)?.archived
-        )
+        .filter((d) => {
+          if (d.assigned_to || ['won', 'lost'].includes(d.stage)) return false;
+          const c = contactById.get(d.contact_id);
+          return !!c && !c.archived && !LEAD_INBOX_STATUSES.includes(c.lead_status);
+        })
         .sort((a, b) => b.created_at.localeCompare(a.created_at)),
     [deals, contactById]
   );
@@ -142,21 +151,21 @@ export default function Leads() {
           {fresh.length > 0 && (
             <Section title="New" hint="untouched — call these first" tone="red">
               {fresh.map((c) => (
-                <LeadRow key={c.id} contact={c} deals={deals} />
+                <LeadRow key={c.id} contact={c} deals={deals} team={team} me={me} iAmAdmin={iAmAdmin} />
               ))}
             </Section>
           )}
           {onHold.length > 0 && (
             <Section title="On hold" hint="waiting on a date or a callback">
               {onHold.map((c) => (
-                <LeadRow key={c.id} contact={c} deals={deals} />
+                <LeadRow key={c.id} contact={c} deals={deals} team={team} me={me} iAmAdmin={iAmAdmin} />
               ))}
             </Section>
           )}
           {inProgress.length > 0 && (
             <Section title="Contacted" hint="first touch made — qualify or close out">
               {inProgress.map((c) => (
-                <LeadRow key={c.id} contact={c} deals={deals} />
+                <LeadRow key={c.id} contact={c} deals={deals} team={team} me={me} iAmAdmin={iAmAdmin} />
               ))}
             </Section>
           )}
@@ -264,11 +273,23 @@ function Section({
   );
 }
 
-function LeadRow({ contact, deals }: { contact: Contact; deals: { id: string; contact_id: string; stage: string }[] }) {
+function LeadRow({
+  contact,
+  deals,
+  team,
+  me,
+  iAmAdmin,
+}: {
+  contact: Contact;
+  deals: Deal[];
+  team: TeamMember[];
+  me: string;
+  iAmAdmin: boolean;
+}) {
   const log = useLogActivity();
   const qc = useQueryClient();
   const { update: updateContact } = useContactMutations();
-  const { create: createDeal } = useDealMutations();
+  const { create: createDeal, assign } = useDealMutations();
   const [holdOpen, setHoldOpen] = useState(false);
   const [dqOpen, setDqOpen] = useState(false);
 
@@ -280,6 +301,48 @@ function LeadRow({ contact, deals }: { contact: Contact; deals: { id: string; co
   const openDeal = deals.find(
     (d) => d.contact_id === contact.id && !['won', 'lost'].includes(d.stage)
   );
+
+  // Assign from the lead row itself — the deal underneath (inbound leads have
+  // one already; created on the spot otherwise) carries the ownership.
+  const assignLead = async (toEmail: string) => {
+    const target = toEmail || null;
+    try {
+      if (openDeal) {
+        await assign.mutateAsync({
+          deal: openDeal,
+          toEmail: target,
+          assigneeName: memberName(team, target),
+          byName: memberName(team, me),
+        });
+      } else {
+        const { data, error } = await sb()
+          .from('deals')
+          .insert({
+            contact_id: contact.id,
+            title: `${contact.name} — new project`,
+            assigned_to: target,
+            created_via: 'app',
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        await logActivity({
+          contact_id: contact.id,
+          deal_id: (data as Deal).id,
+          type: 'note',
+          body: `Lead assigned to ${memberName(team, target)} by ${memberName(team, me)}`,
+        });
+        qc.invalidateQueries({ queryKey: ['deals'] });
+        void fetch('/api/notify-flush', { method: 'POST' }).catch(() => undefined);
+      }
+      toast.success(
+        target ? `Assigned to ${memberName(team, target)}` : 'Unassigned',
+        target && target !== me ? 'Their phone gets a buzz and an email.' : undefined
+      );
+    } catch (err) {
+      toast.error('Could not assign', err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const logCall = async () => {
     try {
@@ -369,6 +432,25 @@ function LeadRow({ contact, deals }: { contact: Contact; deals: { id: string; co
         <Button variant="outline" size="sm" className="h-8" onClick={() => setHoldOpen(true)}>
           <PauseCircle className="mr-1.5 h-3.5 w-3.5" /> Hold
         </Button>
+        {iAmAdmin && (
+          <select
+            value={openDeal?.assigned_to ?? ''}
+            disabled={assign.isPending}
+            onChange={(e) => void assignLead(e.target.value)}
+            title="Who owns this lead"
+            className={cn(
+              'h-8 cursor-pointer rounded-md border bg-white px-2 text-xs',
+              openDeal?.assigned_to ? 'text-brand-black' : 'text-brand-steel'
+            )}
+          >
+            <option value="">Assign to…</option>
+            {team.map((t) => (
+              <option key={t.email} value={t.email}>
+                {t.display_name || t.email}
+              </option>
+            ))}
+          </select>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 px-2">
