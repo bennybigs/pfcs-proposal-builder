@@ -4,7 +4,7 @@
 // change only their own password. The server enforces all of it independently
 // (RLS + /api/team-password); the UI just mirrors the rules.
 import { useEffect, useState } from 'react';
-import { ChevronRight, ShieldCheck, UserPlus } from 'lucide-react';
+import { ChevronRight, Mail, ShieldCheck, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,28 @@ import { supabase } from '@/lib/supabase';
 import { useTeam, useTeamMutations, type TeamMember } from '@/lib/crm/api/team';
 import { formatDateUS } from '@/lib/format';
 
+/** Emails the CRM invitation (app link + install steps; password goes by text). */
+async function sendInvite(toEmail: string, toName: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const token = (await supabase!.auth.getSession()).data.session?.access_token;
+    const r = await fetch('/api/invite-teammate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ toEmail, toName }),
+    });
+    const body = (await r.json()) as { error?: string };
+    if (!r.ok) {
+      return {
+        ok: false,
+        error: r.status === 503 ? 'Email sending is not configured yet.' : body.error ?? `HTTP ${r.status}`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export default function Team() {
   const { data: team = [], isLoading } = useTeam();
   const { add } = useTeamMutations();
@@ -36,13 +58,23 @@ export default function Team() {
     if (!email.includes('@')) return;
     try {
       await add.mutateAsync({ email, name });
-      toast.success(
-        'Teammate added — no email was sent',
-        'Onboarding is by password, not invitation: open their card, set a starter password, then text it to them with the app link.'
-      );
-      setSelectedEmail(email.trim().toLowerCase());
+      const addr = email.trim().toLowerCase();
+      setSelectedEmail(addr);
       setEmail('');
       setName('');
+      const inv = await sendInvite(addr, name);
+      if (inv.ok) {
+        toast.success(
+          'Teammate added — invitation emailed',
+          'They got the app link and install steps. Now set their starter password on this card and text it to them.'
+        );
+      } else {
+        toast.success('Teammate added');
+        toast.error(
+          'Invitation email not sent',
+          `${inv.error ?? ''} You can text them the link instead — and retry from their card.`
+        );
+      }
     } catch (err) {
       toast.error('Could not add', err instanceof Error ? err.message : String(err));
     }
@@ -139,6 +171,7 @@ function MemberCard({
   const [nameDraft, setNameDraft] = useState(member.display_name);
   const [password, setPassword] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
   const [removeArmed, setRemoveArmed] = useState(false);
   useEffect(() => setNameDraft(member.display_name), [member.display_name]);
 
@@ -296,6 +329,32 @@ function MemberCard({
                 Works even before their first sign-in — text it to them with the link.
               </p>
             )}
+          </Section>
+        )}
+
+        {iAmAdmin && !isSelf && (
+          <Section label="Invitation">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border p-3">
+              <div className="min-w-0 flex-1 text-xs text-brand-steel">
+                Emails the app link and phone install steps. Their password still goes by text —
+                never by email.
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={inviteBusy}
+                onClick={async () => {
+                  setInviteBusy(true);
+                  const inv = await sendInvite(member.email, member.display_name);
+                  setInviteBusy(false);
+                  if (inv.ok) toast.success('Invitation emailed', `Sent to ${member.email}.`);
+                  else toast.error('Could not send invitation', inv.error);
+                }}
+              >
+                <Mail className="mr-1.5 h-3.5 w-3.5" />
+                {inviteBusy ? 'Sending…' : 'Email invitation'}
+              </Button>
+            </div>
           </Section>
         )}
 
