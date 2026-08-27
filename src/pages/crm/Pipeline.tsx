@@ -113,7 +113,11 @@ export default function Pipeline() {
   );
   const byStage = useMemo(() => {
     const m = new Map<DealStage, Deal[]>(STAGES.map((s) => [s, []]));
-    for (const d of visible) m.get(d.stage)!.push(d);
+    // a card can arrive wearing a retired stage (written by a stale tab
+    // running old code) — bucket it into the mapped column, never crash
+    const normalize = (s: DealStage): DealStage =>
+      m.has(s) ? s : s === 'site_visit_scheduled' ? 'site_visit' : 'lead';
+    for (const d of visible) m.get(normalize(d.stage))!.push(d);
     for (const list of m.values())
       // red floats to the top of its column, then amber, then oldest-in-stage
       list.sort((a, b) => {
