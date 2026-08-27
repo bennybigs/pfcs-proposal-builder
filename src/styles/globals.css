@@ -105,3 +105,81 @@
     margin: 0.5in;
   }
 }
+
+/* ── dark mode ────────────────────────────────────────────────────────
+   Toggled by .dark on <html> (see ThemeToggle + the pre-paint script in
+   index.html). Two layers: shadcn tokens flip below, and the hardcoded
+   brand utilities are overridden directly — so every existing component
+   goes dark without touching it. Customer-facing paper (proposal preview,
+   share view, PDF containers) sits inside .light-scope and stays white:
+   those are printed documents, not app chrome. */
+.dark {
+  --background: 240 4% 7%;
+  --foreground: 240 5% 92%;
+  --card: 240 4% 11%;
+  --card-foreground: 240 5% 92%;
+  --popover: 240 4% 11%;
+  --popover-foreground: 240 5% 92%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 240 5% 92%;
+  --muted: 240 4% 14%;
+  --muted-foreground: 240 4% 62%;
+  --border: 240 4% 19%;
+  --input: 240 4% 24%;
+}
+
+.dark body { background-color: #101013; color: #ececee; }
+.dark .bg-white { background-color: #17171b; }
+.dark .bg-brand-gray-bg { background-color: #101013; }
+.dark .bg-brand-gray-light { background-color: #26262b; }
+.dark .bg-white\/60 { background-color: rgba(23, 23, 27, 0.6); }
+.dark .bg-gray-100 { background-color: #24242a; }
+.dark .bg-gray-200 { background-color: #2c2c33; }
+.dark .text-brand-black { color: #ececee; }
+.dark .text-brand-steel { color: #a4a4af; }
+.dark .text-gray-600 { color: #a4a4af; }
+.dark .hover\:bg-brand-gray-bg:hover { background-color: #202026; }
+.dark .hover\:bg-white\/60:hover { background-color: rgba(32, 32, 38, 0.6); }
+.dark .border-gray-200 { border-color: #2c2c33; }
+
+/* status banners: tinted glass instead of pastel paper */
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12); }
+.dark .text-amber-800, .dark .text-amber-700 { color: #fbbf24; }
+.dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.45); }
+.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12); }
+.dark .text-green-900, .dark .text-green-700 { color: #6ee7a0; }
+.dark .border-green-600 { border-color: rgba(34, 197, 94, 0.55); }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12); }
+.dark .text-red-700 { color: #f87171; }
+.dark .border-red-200 { border-color: rgba(239, 68, 68, 0.4); }
+.dark .bg-brand-orange\/10 { background-color: rgba(232, 147, 12, 0.16); }
+.dark .bg-brand-orange\/5 { background-color: rgba(232, 147, 12, 0.09); }
+
+/* ── neon ─────────────────────────────────────────────────────────────
+   Orange elements glow in the dark; red badges pulse a little heat. */
+.dark .bg-brand-orange {
+  box-shadow: 0 0 16px rgba(232, 147, 12, 0.35);
+}
+.dark .bg-red-600 {
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+.dark .border-brand-orange {
+  box-shadow: 0 0 10px rgba(232, 147, 12, 0.2);
+}
+
+/* ── the paper stays paper ───────────────────────────────────────────
+   Mirror-resets for everything above, scoped to customer-facing docs. */
+.dark .light-scope { color: #1a1a1a; }
+.dark .light-scope .bg-white { background-color: #ffffff; }
+.dark .light-scope .bg-brand-gray-bg { background-color: #f5f5f5; }
+.dark .light-scope .bg-brand-gray-light { background-color: #e8e8e8; }
+.dark .light-scope .bg-gray-100 { background-color: #f3f4f6; }
+.dark .light-scope .text-brand-black { color: #1a1a1a; }
+.dark .light-scope .text-brand-steel { color: #5a5a5a; }
+.dark .light-scope .bg-amber-50 { background-color: #fffbeb; }
+.dark .light-scope .text-amber-800 { color: #92400e; }
+.dark .light-scope .bg-green-50 { background-color: #f0fdf4; }
+.dark .light-scope .text-green-900 { color: #14532d; }
+.dark .light-scope .text-green-700 { color: #15803d; }
+.dark .light-scope .bg-brand-orange { box-shadow: none; }
+.dark .light-scope * { border-color: #e5e7eb; }

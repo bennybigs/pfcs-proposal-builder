@@ -15,6 +15,7 @@ import { useBuilderSyncStatus } from '@/lib/builderSync';
 import { useSessionEmail } from '@/lib/crm/session';
 import { supabase } from '@/lib/supabase';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 /** Cloud badge for proposal documents: synced / signed-out / error. */
 function SyncBadge() {
@@ -131,7 +132,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
             <img
               src={logoUrl}
               alt="PFCS"
-              className="h-12 max-w-[96px] object-contain sm:h-[72px] sm:max-w-[400px]"
+              className="h-12 max-w-[96px] rounded-lg object-contain sm:h-[72px] sm:max-w-[400px]"
             />
           </Link>
           <nav className="flex items-center gap-1">
@@ -162,6 +163,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
           <SyncBadge />
           {right}
           <ProfileButton />

@@ -23,6 +23,11 @@
   <body>
     <div id="root"></div>
     <script>
+      // apply the saved theme before first paint — no flash of the wrong mode
+      if (localStorage.getItem('pfcs-theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-color-mode', 'dark');
+      }
       // Chrome/Edge fire beforeinstallprompt before React mounts, and the event
       // only fires once — capture it here so the Install button can use it.
       window.__pfcsInstallPrompt = null;

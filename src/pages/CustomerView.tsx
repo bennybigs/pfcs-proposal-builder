@@ -56,7 +56,7 @@ export default function CustomerView() {
   }
 
   return (
-    <div className="min-h-screen py-8 print:py-0">
+    <div className="light-scope min-h-screen bg-brand-gray-bg py-8 print:py-0">
       {isOwner && (
         <div className="no-print fixed left-4 top-4 z-50">
           <Button asChild variant="outline" size="sm" className="shadow-lg">

@@ -511,7 +511,7 @@ export default function Editor() {
 
       {/* Customer-view preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto bg-brand-gray-bg p-4 sm:p-6">
+        <DialogContent className="light-scope max-h-[90vh] max-w-4xl overflow-y-auto bg-brand-gray-bg p-4 sm:p-6">
           <DialogTitle className="sr-only">Customer Preview</DialogTitle>
           <CustomerProposal proposal={proposal} company={companySnapshot(settings)} />
           {/* Inert copy of the e-sign section so Preview matches the shared link */}
@@ -526,7 +526,7 @@ export default function Editor() {
         aria-hidden
         style={{ position: 'fixed', left: '-10000px', top: 0, width: '816px', zIndex: -1 }}
       >
-        <div ref={pdfContainerRef}>
+        <div ref={pdfContainerRef} className="light-scope">
           <CustomerProposal proposal={proposal} company={companySnapshot(settings)} />
         </div>
       </div>
@@ -537,7 +537,7 @@ export default function Editor() {
           aria-hidden
           style={{ position: 'fixed', left: '-10000px', top: 0, width: '816px', zIndex: -1 }}
         >
-          <div ref={cardPdfContainerRef}>
+          <div ref={cardPdfContainerRef} className="light-scope">
             <SingleCardDocument
               card={proposal.cards.find((c) => c.id === exportCardId)!}
               proposal={proposal}

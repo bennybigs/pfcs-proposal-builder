@@ -83,7 +83,7 @@ export function TopBar({
           <img
             src={logoUrl}
             alt="PFCS"
-            className="h-12 max-w-[130px] object-contain sm:h-[72px] sm:max-w-[340px]"
+            className="h-12 max-w-[130px] rounded-lg object-contain sm:h-[72px] sm:max-w-[340px]"
           />
         </Link>
 
