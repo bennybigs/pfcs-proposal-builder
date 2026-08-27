@@ -151,13 +151,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let createdContact = false;
     if (!contact) {
+      // store phone E.164 like the app does
+      const digits10 = phone.replace(/\D/g, '');
+      const e164 =
+        digits10.length === 10 ? `+1${digits10}`
+        : digits10.length === 11 && digits10.startsWith('1') ? `+${digits10}`
+        : phone;
       const rows = await pg<{ id: string; name: string }[]>('contacts', {
         method: 'POST',
         body: JSON.stringify({
-          name, email, phone, address,
+          name, email, phone: e164, address,
           source, source_detail: sourceDetail,
           notes: '',
           lead_status: 'new', // lights the red counter in the app
+          // the customer's own words, pinned in the drawer
+          intake_note: message || null,
+          intake_source: 'website form',
+          intake_at: new Date().toISOString(),
         }),
       });
       contact = rows[0];
@@ -205,6 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type: 'note',
         body: `Inbound lead via API — ${source}${sourceDetail ? `/${sourceDetail}` : ''} (${key.label})${message ? ` — "${message}"` : ''}${specs}`,
         logged_by: `api:${key.label}`,
+        source: 'system',
       }),
     });
 

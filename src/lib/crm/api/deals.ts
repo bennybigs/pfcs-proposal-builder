@@ -59,12 +59,15 @@ export async function updateDeal(id: string, patch: Partial<DealInput>): Promise
  */
 export async function moveDealStage(deal: Deal, to: DealStage, lostReason?: string): Promise<void> {
   if (deal.stage === to) return;
+  // probability auto-suggests from the stage, but a manual override sticks:
+  // only replace it when it still equals the OLD stage's default
+  const untouched = deal.probability === STAGE_META[deal.stage].probability;
   const { error } = await sb()
     .from('deals')
     .update({
       stage: to,
       stage_entered_at: new Date().toISOString(),
-      probability: STAGE_META[to].probability,
+      probability: untouched ? STAGE_META[to].probability : deal.probability,
       lost_reason: to === 'lost' ? (lostReason ?? deal.lost_reason) : deal.lost_reason,
     })
     .eq('id', deal.id);
@@ -73,6 +76,7 @@ export async function moveDealStage(deal: Deal, to: DealStage, lostReason?: stri
     contact_id: deal.contact_id,
     deal_id: deal.id,
     type: 'note',
+    source: 'system',
     body: `Stage: ${STAGE_META[deal.stage].label} → ${STAGE_META[to].label}${to === 'lost' && lostReason ? ` — ${lostReason}` : ''}`,
   });
   // Lead lifecycle: winning makes a customer; any other move on a deal that
@@ -103,6 +107,7 @@ export async function assignDeal(
     contact_id: deal.contact_id,
     deal_id: deal.id,
     type: 'note',
+    source: 'system',
     body: toEmail ? `Assigned to ${assigneeName} by ${byName}` : `Unassigned by ${byName}`,
   });
   // fire-and-forget: deliver the notification email the trigger just queued

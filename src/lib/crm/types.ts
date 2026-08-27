@@ -16,7 +16,25 @@ export type ActivityType =
   | 'meeting'
   | 'site_visit'
   | 'note'
-  | 'proposal_event';
+  | 'proposal_event'
+  | 'field_change';
+
+export type CallOutcome =
+  | 'connected'
+  | 'voicemail'
+  | 'no_answer'
+  | 'busy'
+  | 'bad_number'
+  | 'wrong_person';
+
+export const CALL_OUTCOMES: { value: CallOutcome; label: string }[] = [
+  { value: 'connected', label: 'Connected' },
+  { value: 'voicemail', label: 'Left voicemail' },
+  { value: 'no_answer', label: 'No answer' },
+  { value: 'busy', label: 'Busy' },
+  { value: 'bad_number', label: 'Bad number' },
+  { value: 'wrong_person', label: 'Wrong person' },
+];
 
 /**
  * Lead is a stage of a contact's life, not a separate record. new/contacted/
@@ -26,6 +44,7 @@ export type ActivityType =
  */
 export type LeadStatus =
   | 'new'
+  | 'attempted_contact'
   | 'contacted'
   | 'on_hold'
   | 'qualified'
@@ -47,6 +66,12 @@ export interface Contact {
   archived: boolean;
   lead_status: LeadStatus;
   lead_hold_until: string | null; // ISO date — when an on-hold lead resurfaces
+  disqualify_reason: string | null;
+  intake_note: string | null;     // the pinned original inquiry note
+  intake_source: string | null;   // 'website form' / 'in-app form' / ...
+  intake_at: string | null;
+  phone2: string;                 // optional secondary phone
+  preferred_contact: string | null; // 'call' | 'text' | 'email'
   created_at: string;
   updated_at: string;
   owner: string | null;
@@ -63,6 +88,8 @@ export interface Deal {
   expected_close: string | null;
   probability: number;
   lost_reason: string | null;
+  lost_to: string | null;      // competitor / price note on a lost deal
+  site_address: string;        // the project site (mailing address lives on the contact)
   notes: string;
   assigned_to: string | null;  // team member email — who works this deal
   closed_by: string | null;    // snapshot at won; commission attribution, never rewritten
@@ -91,6 +118,11 @@ export interface Activity {
   body: string;
   happened_at: string;
   logged_by: string;
+  source: string;              // 'manual' | 'system' | future telephony provider
+  direction: string | null;    // 'inbound' | 'outbound'
+  outcome: string | null;      // CallOutcome for calls
+  duration_min: number | null;
+  edited_at: string | null;
 }
 
 export interface Task {
@@ -158,6 +190,7 @@ export const SOURCE_LABEL: Record<ContactSource, string> = {
 
 export const LEAD_STATUSES: LeadStatus[] = [
   'new',
+  'attempted_contact',
   'contacted',
   'on_hold',
   'qualified',
@@ -168,8 +201,9 @@ export const LEAD_STATUSES: LeadStatus[] = [
 
 export const LEAD_STATUS_META: Record<LeadStatus, { label: string; color: string }> = {
   new: { label: 'New lead', color: 'bg-red-100 text-red-700' },
+  attempted_contact: { label: 'Attempted contact', color: 'bg-orange-100 text-orange-700' },
   contacted: { label: 'Contacted', color: 'bg-sky-100 text-sky-700' },
-  on_hold: { label: 'On hold', color: 'bg-amber-100 text-amber-800' },
+  on_hold: { label: 'Nurture', color: 'bg-amber-100 text-amber-800' },
   qualified: { label: 'Qualified', color: 'bg-green-100 text-green-700' },
   customer: { label: 'Customer', color: 'bg-emerald-100 text-emerald-800' },
   disqualified: { label: 'Disqualified', color: 'bg-gray-200 text-gray-600' },
@@ -177,7 +211,7 @@ export const LEAD_STATUS_META: Record<LeadStatus, { label: string; color: string
 };
 
 /** Statuses that appear in the Leads inbox. */
-export const LEAD_INBOX_STATUSES: LeadStatus[] = ['new', 'contacted', 'on_hold'];
+export const LEAD_INBOX_STATUSES: LeadStatus[] = ['new', 'attempted_contact', 'contacted', 'on_hold'];
 
 /** Human outreach — the activity types that flip a new lead to "contacted". */
 export const HUMAN_TOUCH_TYPES: ActivityType[] = ['call', 'text', 'email', 'meeting', 'site_visit'];
@@ -190,6 +224,7 @@ export const ACTIVITY_META: Record<ActivityType, { label: string }> = {
   site_visit: { label: 'Site Visit' },
   note: { label: 'Note' },
   proposal_event: { label: 'Proposal' },
+  field_change: { label: 'Change' },
 };
 
 /** Whole-dollar USD everywhere in the CRM (the brief's currency rule). */

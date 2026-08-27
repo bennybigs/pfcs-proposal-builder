@@ -9,6 +9,10 @@ export interface ActivityInput {
   type: ActivityType;
   body?: string;
   happened_at?: string;
+  source?: string;              // default 'manual'; 'system' entries are immutable (RLS)
+  direction?: string | null;
+  outcome?: string | null;
+  duration_min?: number | null;
 }
 
 export async function logActivity(input: ActivityInput): Promise<Activity> {
@@ -28,6 +32,36 @@ export async function logActivity(input: ActivityInput): Promise<Activity> {
     }
   }
   return data as Activity;
+}
+
+/** System bookkeeping entry — immutable once written (RLS enforces it). */
+export async function logSystem(
+  contactId: string,
+  dealId: string | null,
+  body: string,
+  type: ActivityType = 'field_change'
+): Promise<void> {
+  try {
+    await logActivity({ contact_id: contactId, deal_id: dealId, type, body, source: 'system' });
+  } catch {
+    // bookkeeping must never break the action it describes
+  }
+}
+
+/** Author-only edit of a manual entry (RLS backs this up). */
+export async function updateActivity(id: string, body: string): Promise<void> {
+  const { error, count } = await sb()
+    .from('activities')
+    .update({ body, edited_at: new Date().toISOString() }, { count: 'exact' })
+    .eq('id', id);
+  if (error) throw error;
+  if (!count) throw new Error('Only the author can edit this entry.');
+}
+
+export async function deleteActivity(id: string): Promise<void> {
+  const { error, count } = await sb().from('activities').delete({ count: 'exact' }).eq('id', id);
+  if (error) throw error;
+  if (!count) throw new Error('Only the author can delete this entry.');
 }
 
 export async function listActivitiesForContact(contactId: string): Promise<Activity[]> {

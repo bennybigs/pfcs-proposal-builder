@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 import { useContactMutations, useContacts } from '@/lib/crm/api/contacts';
+import { normalizePhone } from '@/lib/crm/phone';
 import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import {
   LEAD_STATUSES,
@@ -83,7 +84,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
   const payload = () => ({
     name: form.name.trim(),
     email: form.email.trim(),
-    phone: form.phone.trim(),
+    phone: form.phone.trim() ? (normalizePhone(form.phone) ?? form.phone.trim()) : '',
     address: form.address.trim(),
     company_name: form.company_name.trim(),
     source: form.source,
@@ -96,6 +97,11 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
   });
 
   const save = async () => {
+    // phones store E.164 — same rule as the drawer and lead form
+    if (form.phone.trim() && normalizePhone(form.phone) === null) {
+      toast.error('Bad phone number', 'Use a 10-digit US number, e.g. (330) 555-0141.');
+      return;
+    }
     try {
       if (contact) {
         await update.mutateAsync({ id: contact.id, patch: payload() });

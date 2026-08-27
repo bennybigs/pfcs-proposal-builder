@@ -30,6 +30,7 @@ import { SourceDetailInput } from '@/components/crm/ContactDialog';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { useTeam, memberName } from '@/lib/crm/api/team';
 import { logActivity } from '@/lib/crm/api/activities';
+import { normalizePhone } from '@/lib/crm/phone';
 import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import {
   SEGMENTS,
@@ -101,6 +102,12 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
 
   const submit = async (useExisting?: Contact | 'create_new') => {
     if (!valid || busy) return;
+    // phones are stored E.164 — reject garbage before it becomes a dead Call button
+    const phoneNorm = form.phone.trim() ? normalizePhone(form.phone) : '';
+    if (phoneNorm === null) {
+      toast.error('Bad phone number', 'Use a 10-digit US number, e.g. (330) 555-0141.');
+      return;
+    }
     // first submit: check for an existing person before creating anything
     if (!useExisting) {
       const dup = findDuplicate();
@@ -121,6 +128,19 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
           .update({ lead_status: 'new', lead_hold_until: null })
           .eq('id', contact.id)
           .in('lead_status', ['none', 'disqualified']);
+        // their words still matter: pin them if the slot is empty, else log them
+        if (form.notes.trim()) {
+          if (!contact.intake_note) {
+            await sb()
+              .from('contacts')
+              .update({
+                intake_note: form.notes.trim(),
+                intake_source: 'in-app form',
+                intake_at: new Date().toISOString(),
+              })
+              .eq('id', contact.id);
+          }
+        }
       } else {
         // owner stamp: under rep RLS you can only read back contacts you
         // created or that carry your deal — owner covers the moment between
@@ -129,13 +149,17 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
           .from('contacts')
           .insert({
             name: form.name.trim(),
-            phone: form.phone.trim(),
+            phone: phoneNorm,
             email: form.email.trim(),
             address: form.address.trim(),
             source: form.source,
             source_detail: form.source_detail.replace(/\s+/g, ' ').trim() || null,
             lead_status: 'new',
             owner: userId,
+            // the pinned intake note — the fix for "notes typed at intake vanish"
+            intake_note: form.notes.trim() || null,
+            intake_source: 'in-app form',
+            intake_at: new Date().toISOString(),
           })
           .select()
           .single();
@@ -163,7 +187,8 @@ export function NewLeadDialog({ open, onOpenChange }: Props) {
         contact_id: contact.id,
         deal_id: (deal as Deal).id,
         type: 'note',
-        body: `Lead created${assignee ? ` — assigned to ${memberName(team, assignee)}` : ''}${form.notes.trim() ? ` — "${form.notes.trim()}"` : ''}`,
+        source: 'system',
+        body: `Lead created${assignee ? ` — assigned to ${memberName(team, assignee)}` : ''}`,
       });
 
       qc.invalidateQueries({ queryKey: ['contacts'] });

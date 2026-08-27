@@ -72,6 +72,7 @@ const TYPE_ICON: Record<ActivityType, React.ReactNode> = {
   site_visit: <MapPin className="h-3.5 w-3.5" />,
   note: <StickyNote className="h-3.5 w-3.5" />,
   proposal_event: <FileText className="h-3.5 w-3.5" />,
+  field_change: <Pencil className="h-3.5 w-3.5" />,
 };
 
 export default function ContactDetail() {
