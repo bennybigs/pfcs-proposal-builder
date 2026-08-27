@@ -75,13 +75,29 @@ export function useBuilderCloudSync(): void {
         (p) => lastPushed.get(p.id) !== (p.updatedAt ?? '')
       );
       for (const p of dirty) {
+        // created_by is never sent — the DB trigger stamps it on first
+        // insert and upsert-updates leave it alone (rep RLS keys off it)
         const { error } = await sb.from('proposals').upsert({
           id: p.id,
           data: p,
           updated_at: new Date().toISOString(),
           updated_by: who,
         });
-        if (error) throw error;
+        if (error) {
+          // 42501 = row-level security: this proposal belongs to someone
+          // else now (stale cache on this device, or the deal moved away).
+          // Drop the local copy instead of looping on an error forever.
+          if ((error as { code?: string }).code === '42501') {
+            applyingRemote = true;
+            const next = { ...useProposalStore.getState().proposals };
+            delete next[p.id];
+            useProposalStore.setState({ proposals: next });
+            applyingRemote = false;
+            lastPushed.delete(p.id);
+            continue;
+          }
+          throw error;
+        }
         lastPushed.set(p.id, p.updatedAt ?? '');
       }
       // deletions: ids the server knows that no longer exist locally
@@ -133,6 +149,29 @@ export function useBuilderCloudSync(): void {
         const { data: rows, error } = await sb.from('proposals').select('*');
         if (error) throw error;
         adoptRemoteProposals((rows ?? []) as ProposalRow[]);
+
+        // Rep walls: a local copy that is CRM-linked to a deal this account
+        // can't see belongs to someone else — clear it from this device.
+        // (Admins see every deal, so nothing is ever pruned for them.)
+        const serverIds = new Set(((rows ?? []) as ProposalRow[]).map((r) => r.id));
+        const { data: visibleDeals } = await sb.from('deals').select('id');
+        const visible = new Set((visibleDeals ?? []).map((d: { id: string }) => d.id));
+        const localNow = useProposalStore.getState().proposals;
+        const pruned = { ...localNow };
+        let prunedAny = false;
+        for (const p of Object.values(localNow)) {
+          if (serverIds.has(p.id)) continue; // server says it's mine — keep
+          if (p.crm?.dealId && !visible.has(p.crm.dealId)) {
+            delete pruned[p.id];
+            prunedAny = true;
+            lastPushed.delete(p.id);
+          }
+        }
+        if (prunedAny) {
+          applyingRemote = true;
+          useProposalStore.setState({ proposals: pruned });
+          applyingRemote = false;
+        }
 
         const { data: libRow } = await sb
           .from('builder_shared')

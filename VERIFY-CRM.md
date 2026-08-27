@@ -324,3 +324,16 @@ select ✓, cross-rep edit = 0 rows ✓, reassign-away = 403 ✓, unassigned cre
 
 Known boundary, deliberate: the PROPOSAL DOCUMENT library (builder) is still
 team-wide — proposals aren't assignment-aware yet. Say the word to scope those too.
+
+### Proposal documents follow the rep walls (same day)
+
+A rep's proposal library now contains only: proposals they created (created_by,
+trigger-stamped at first sync) plus proposals linked — via the in-app "Link to
+CRM" or a proposal_links row — to a deal assigned to them. Admins see all.
+Card library + company settings stay team-wide (company assets, not customer data).
+
+Sync self-heals: a device holding stale copies of someone else's proposals drops
+them quietly on next sync instead of erroring (RLS 42501 → prune local copy;
+CRM-linked strays pruned on pull). Verified adversarially with a throwaway rep:
+sees exactly own + linked (not Ben's), cross-edit = 0 rows, upsert-over = 403,
+victim row intact, creator stamping correct.

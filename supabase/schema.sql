@@ -248,10 +248,12 @@ create table if not exists public.builder_shared (
 alter table public.proposals      enable row level security;
 alter table public.builder_shared enable row level security;
 
+-- builder_shared (card library + settings) stays team-wide: templates are
+-- company assets, not customer data, and reps need them to build proposals.
 do $$
 declare t text;
 begin
-  foreach t in array array['proposals', 'builder_shared'] loop
+  foreach t in array array['builder_shared'] loop
     execute format('drop policy if exists "team select" on public.%I', t);
     execute format('create policy "team select" on public.%I for select using (public.is_team_member())', t);
     execute format('drop policy if exists "team insert" on public.%I', t);
@@ -262,6 +264,62 @@ begin
     execute format('create policy "team delete" on public.%I for delete using (public.is_team_member())', t);
   end loop;
 end $$;
+
+-- ── proposal documents follow the rep walls (2026-08-26) ────────────
+-- A rep sees a proposal when they created it, or it's linked (via the jsonb
+-- crm stamp or a proposal_links row) to a deal assigned to them. Admins see
+-- all. created_by is stamped by trigger on first insert and never rewritten
+-- by the sync's upserts (the client never sends it).
+alter table public.proposals add column if not exists created_by text not null default '';
+update public.proposals set created_by = updated_by where created_by = '';
+
+create or replace function public.stamp_proposal_creator() returns trigger
+language plpgsql as $$
+begin
+  if new.created_by = '' then
+    new.created_by := coalesce(auth.email(), '');
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists proposals_stamp_creator on public.proposals;
+create trigger proposals_stamp_creator before insert on public.proposals
+  for each row execute function public.stamp_proposal_creator();
+
+create or replace function public.can_see_proposal(pid text, pcreated text, pdata jsonb)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_admin()
+      or (pcreated <> '' and pcreated = auth.email())
+      or exists (select 1 from public.deals d
+                   where d.id::text = (pdata->'crm'->>'dealId')
+                     and d.assigned_to = auth.email())
+      or exists (select 1 from public.proposal_links pl
+                   join public.deals d on d.id = pl.deal_id
+                  where pl.proposal_id = pid and d.assigned_to = auth.email());
+$$;
+
+do $$
+begin
+  execute 'drop policy if exists "team select" on public.proposals';
+  execute 'drop policy if exists "team insert" on public.proposals';
+  execute 'drop policy if exists "team update" on public.proposals';
+  execute 'drop policy if exists "team delete" on public.proposals';
+end $$;
+
+drop policy if exists "role select" on public.proposals;
+create policy "role select" on public.proposals for select
+  using (public.is_team_member() and public.can_see_proposal(id, created_by, data));
+drop policy if exists "role insert" on public.proposals;
+create policy "role insert" on public.proposals for insert
+  with check (public.is_team_member());
+drop policy if exists "role update" on public.proposals;
+create policy "role update" on public.proposals for update
+  using (public.is_team_member() and public.can_see_proposal(id, created_by, data))
+  with check (public.is_team_member());
+drop policy if exists "role delete" on public.proposals;
+create policy "role delete" on public.proposals for delete
+  using (public.is_team_member() and public.can_see_proposal(id, created_by, data));
 
 -- ── contact files (Supabase Storage) ────────────────────────────────
 -- Private bucket "contact-files" (create in Dashboard → Storage or via API);
