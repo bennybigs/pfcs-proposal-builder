@@ -9,7 +9,7 @@
 //   - filterable activity timeline with author-only edit/delete of manual notes
 // Won/Lost buttons and the plain stage select remain until §4's stepper.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
@@ -132,6 +132,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const log = useLogActivity();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: links = [] } = useDealProposalLinks(deal ? [deal.id] : []);
   const { data: activities = [] } = useContactActivities(contact?.id);
   const localProposals = useProposalStore((s) => s.proposals);
@@ -528,6 +530,19 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                       <span className="text-brand-steel">{formatDollars(pl.total)}</span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {local && (
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() =>
+                            navigate(`/proposal/${pl.proposal_id}`, {
+                              state: { from: location.pathname + location.search },
+                            })
+                          }
+                        >
+                          <Pencil className="mr-1 h-3 w-3" /> Edit proposal
+                        </Button>
+                      )}
                       {pl.share_url && (
                         <Button asChild size="sm" variant="outline" className="h-7 text-xs">
                           <a href={pl.share_url} target="_blank" rel="noreferrer">

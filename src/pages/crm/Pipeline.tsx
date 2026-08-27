@@ -64,9 +64,9 @@ export default function Pipeline() {
   const [assignee, setAssignee] = useState('');
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
-  // archived contacts take their deals off the board and out of the numbers
+  // archived cards/contacts take their deals off the board and out of the numbers
   const activeDeals = useMemo(
-    () => deals.filter((d) => !contactById.get(d.contact_id)?.archived),
+    () => deals.filter((d) => !d.archived_at && !contactById.get(d.contact_id)?.archived),
     [deals, contactById]
   );
   const quiet = useMemo(() => goneQuietDealIds(activeDeals, activities, tasks), [activeDeals, activities, tasks]);
@@ -95,9 +95,13 @@ export default function Pipeline() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearAgo = new Date(now);
     yearAgo.setFullYear(now.getFullYear() - 1);
-    const openByStage = OPEN_STAGES.map((s) => ({
+    // Lead cards are usually $0 and would inflate the number — count them,
+    // never sum them; everywhere else show raw + probability-weighted
+    const leadCount = (byStage.get('lead') ?? []).length;
+    const openByStage = OPEN_STAGES.filter((s) => s !== 'lead').map((s) => ({
       stage: s,
       total: (byStage.get(s) ?? []).reduce((n, d) => n + d.value, 0),
+      weighted: (byStage.get(s) ?? []).reduce((n, d) => n + (d.value * d.probability) / 100, 0),
       count: (byStage.get(s) ?? []).length,
     }));
     const wonThisMonth = activeDeals
@@ -108,7 +112,7 @@ export default function Pipeline() {
     );
     const won12 = closed12.filter((d) => d.stage === 'won').length;
     const winRate = closed12.length ? Math.round((won12 / closed12.length) * 100) : null;
-    return { openByStage, wonThisMonth, winRate, quietCount: quiet.size };
+    return { leadCount, openByStage, wonThisMonth, winRate, quietCount: quiet.size };
   }, [activeDeals, byStage, quiet]);
 
   const sensors = useSensors(
@@ -178,9 +182,18 @@ export default function Pipeline() {
 
       {/* dashboard strip */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 text-xs">
-        {stats.openByStage.map(({ stage, total, count }) => (
+        <div className="shrink-0 rounded-md border bg-white px-3 py-1.5 shadow-sm">
+          <div className="font-semibold text-brand-black">{stats.leadCount}</div>
+          <div className="text-brand-steel">Leads (count)</div>
+        </div>
+        {stats.openByStage.map(({ stage, total, weighted, count }) => (
           <div key={stage} className="shrink-0 rounded-md border bg-white px-3 py-1.5 shadow-sm">
-            <div className="font-semibold text-brand-black">{formatDollars(total)}</div>
+            <div className="font-semibold text-brand-black">
+              {formatDollars(total)}
+              <span className="ml-1 font-normal text-brand-steel" title="Probability-weighted">
+                · w {formatDollars(weighted)}
+              </span>
+            </div>
             <div className="text-brand-steel">
               {STAGE_META[stage].label} ({count})
             </div>
@@ -276,7 +289,10 @@ function StageColumn({
           {STAGE_META[stage].label}
         </span>
         <span className="text-xs text-brand-steel">{deals.length}</span>
-        <span className="ml-auto text-xs font-medium text-brand-steel">{formatDollars(total)}</span>
+        {/* Lead column shows a count only — untouched inquiries don't inflate totals */}
+        {stage !== 'lead' && (
+          <span className="ml-auto text-xs font-medium text-brand-steel">{formatDollars(total)}</span>
+        )}
       </div>
       <div className="grid min-h-16 gap-2">
         {deals.map((d) => (

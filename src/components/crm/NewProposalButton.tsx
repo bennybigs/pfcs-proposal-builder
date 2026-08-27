@@ -2,7 +2,7 @@
 // brief: no open deal → auto-create one at Inquiry; exactly one → use it;
 // several → ask which.
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FilePlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,13 +26,15 @@ export function NewProposalButton({
   size?: 'sm' | 'default';
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [busy, setBusy] = useState(false);
   const [choices, setChoices] = useState<Deal[] | null>(null);
 
   const start = async (target: Deal) => {
     try {
       const id = await createProposalForContact(contact, target);
-      navigate(`/proposal/${id}`);
+      // remember where we came from so the editor's Done button returns here
+      navigate(`/proposal/${id}`, { state: { from: location.pathname + location.search } });
     } catch (err) {
       toast.error('Could not start proposal', err instanceof Error ? err.message : String(err));
     }

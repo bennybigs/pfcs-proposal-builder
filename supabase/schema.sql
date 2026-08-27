@@ -716,3 +716,35 @@ do $$ begin
     insert into public.schema_markers (key) values ('lead_status_backfill');
   end if;
 end $$;
+
+-- ── one-card pipeline (2026-08-27, Ben's unification brief) ─────────
+-- Lead is the first PIPELINE stage, not a separate thing. deal_stage gained
+-- 'lead', 'follow_up', 'site_visit', 'estimate' (legacy 'inquiry' and
+-- 'site_visit_scheduled' remain in the enum for old history rows only).
+-- Hold is an overlay (held_until/hold_note — stage stays, clock pauses);
+-- archive keeps everything (archived_at/archive_reason, phase 4);
+-- reminder_at is the per-card aging override (phase 3).
+-- Applied 2026-08-27 via management API with the row mapping:
+--   inquiry + contact new/attempted  → lead
+--   inquiry + contact contacted+     → follow_up
+--   inquiry + contact disqualified   → lost (reason carried over)
+--   site_visit_scheduled             → site_visit
+do $$ begin
+  alter type deal_stage add value if not exists 'lead' before 'inquiry';
+exception when others then null; end $$;
+do $$ begin
+  alter type deal_stage add value if not exists 'follow_up' after 'lead';
+exception when others then null; end $$;
+do $$ begin
+  alter type deal_stage add value if not exists 'site_visit' after 'follow_up';
+exception when others then null; end $$;
+do $$ begin
+  alter type deal_stage add value if not exists 'estimate' after 'site_visit';
+exception when others then null; end $$;
+
+alter table public.deals add column if not exists held_until date,
+                         add column if not exists hold_note text,
+                         add column if not exists reminder_at timestamptz,
+                         add column if not exists archived_at timestamptz,
+                         add column if not exists archive_reason text;
+alter table public.deals alter column stage set default 'lead';

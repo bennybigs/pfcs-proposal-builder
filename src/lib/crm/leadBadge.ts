@@ -30,11 +30,14 @@ export async function refreshLeadBadge(): Promise<void> {
     useLeadBadge.setState({ count: 0 });
     return;
   }
+  // one-card model: the red dot counts Lead-stage cards that aren't archived
+  // and aren't paused on hold (a hold whose callback date arrived counts again)
   const { count, error } = await supabase
-    .from('contacts')
+    .from('deals')
     .select('id', { count: 'exact', head: true })
-    .eq('archived', false)
-    .or(`lead_status.eq.new,and(lead_status.eq.on_hold,lead_hold_until.lte.${todayIso()})`);
+    .eq('stage', 'lead')
+    .is('archived_at', null)
+    .or(`held_until.is.null,held_until.lte.${todayIso()}`);
   // RLS quietly returns 0 rows for non-members — that renders as "no dot", correct.
   if (!error) useLeadBadge.setState({ count: count ?? 0 });
 }

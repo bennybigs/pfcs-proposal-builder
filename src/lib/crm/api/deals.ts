@@ -26,7 +26,7 @@ export async function listDealsForContact(contactId: string): Promise<Deal[]> {
 }
 
 export async function createDeal(input: DealInput): Promise<Deal> {
-  const stage = input.stage ?? 'inquiry';
+  const stage = input.stage ?? 'lead';
   // you create it, you own it (RLS requires reps to self-assign; admins can
   // still pass assigned_to: null explicitly for the unassigned queue)
   const assigned_to =

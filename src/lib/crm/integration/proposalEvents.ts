@@ -52,7 +52,7 @@ export function logProposalEvent(
       // auto-advance early-stage deals
       const { data: deal } = await supabase.from('deals').select('*').eq('id', dealId).maybeSingle();
       const d = deal as Deal | null;
-      if (d && (d.stage === 'inquiry' || d.stage === 'site_visit_scheduled')) {
+      if (d && ['lead', 'follow_up', 'site_visit', 'estimate', 'inquiry', 'site_visit_scheduled'].includes(d.stage)) {
         const to: DealStage = 'proposal_sent';
         await supabase
           .from('deals')
