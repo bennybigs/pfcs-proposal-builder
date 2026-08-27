@@ -20,6 +20,14 @@ import { toast } from '@/components/ui/toast';
 import { useSessionEmail } from '@/components/crm/AuthGate';
 import { supabase } from '@/lib/supabase';
 import { useTeam, useTeamMutations, type TeamMember } from '@/lib/crm/api/team';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  saveCrmSettings,
+  useCrmSettings,
+  DEFAULT_CRM_SETTINGS,
+  type CrmSettings,
+} from '@/lib/crm/aging';
+import { STAGE_META, type DealStage } from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
 
 /** Emails the CRM invitation (app link + install steps; password goes by text). */
@@ -153,6 +161,108 @@ export default function Team() {
           onClose={() => setSelectedEmail(null)}
         />
       )}
+
+      {iAmAdmin && <CrmSettingsPanel />}
+    </div>
+  );
+}
+
+const AGING_STAGES: DealStage[] = ['lead', 'follow_up', 'site_visit', 'estimate', 'proposal_sent', 'negotiating'];
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const hourLabel = (h: number) =>
+  h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+
+/** Stage clocks, per-stage pings, quiet hours — the aging engine's knobs. */
+function CrmSettingsPanel() {
+  const { data } = useCrmSettings();
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<CrmSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  const s = draft ?? data ?? DEFAULT_CRM_SETTINGS;
+
+  const setLimit = (stage: DealStage, hours: number) =>
+    setDraft({ ...s, stageLimitHours: { ...s.stageLimitHours, [stage]: Math.max(1, hours) } });
+  const setNotify = (stage: DealStage, on: boolean) =>
+    setDraft({ ...s, notifyStages: { ...s.notifyStages, [stage]: on } });
+
+  const save = async () => {
+    if (!draft) return;
+    setBusy(true);
+    try {
+      await saveCrmSettings(draft);
+      qc.invalidateQueries({ queryKey: ['crm_settings'] });
+      setDraft(null);
+      toast.success('Settings saved', 'Clocks and pings follow the new limits within 15 minutes.');
+    } catch (err) {
+      toast.error('Could not save', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-lg font-bold text-brand-black">CRM settings</h2>
+      <p className="mt-1 text-sm text-brand-steel">
+        How long a card may sit in each stage before it turns amber (red at double), whether that
+        stage pings phones, and when nobody gets pinged at all. A follow-up task is always created
+        at the limit, ping or not.
+      </p>
+      <div className="mt-3 overflow-hidden rounded-lg border bg-white shadow-sm">
+        {AGING_STAGES.map((stage) => (
+          <div key={stage} className="flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0">
+            <span className={`w-28 shrink-0 rounded-full px-2 py-0.5 text-center text-[10px] font-semibold ${STAGE_META[stage].color}`}>
+              {STAGE_META[stage].label}
+            </span>
+            <div className="flex items-center gap-1.5 text-sm">
+              <Input
+                inputMode="numeric"
+                className="h-8 w-20 text-center"
+                value={String(s.stageLimitHours[stage] ?? '')}
+                onChange={(e) => setLimit(stage, Number(e.target.value.replace(/[^\d]/g, '')) || 1)}
+              />
+              <span className="text-xs text-brand-steel">hours</span>
+            </div>
+            <div className="flex-1" />
+            <label className="flex items-center gap-2 text-xs text-brand-steel">
+              Ping phone
+              <Switch
+                checked={s.notifyStages[stage] ?? true}
+                onCheckedChange={(on) => setNotify(stage, on)}
+              />
+            </label>
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+          <span className="text-sm font-medium text-brand-black">Quiet hours</span>
+          <select
+            value={s.quietHours.start}
+            onChange={(e) => setDraft({ ...s, quietHours: { ...s.quietHours, start: Number(e.target.value) } })}
+            className="h-8 rounded-md border bg-white px-2 text-sm"
+          >
+            {HOURS.map((h) => (
+              <option key={h} value={h}>{hourLabel(h)}</option>
+            ))}
+          </select>
+          <span className="text-xs text-brand-steel">to</span>
+          <select
+            value={s.quietHours.end}
+            onChange={(e) => setDraft({ ...s, quietHours: { ...s.quietHours, end: Number(e.target.value) } })}
+            className="h-8 rounded-md border bg-white px-2 text-sm"
+          >
+            {HOURS.map((h) => (
+              <option key={h} value={h}>{hourLabel(h)}</option>
+            ))}
+          </select>
+          <span className="text-xs text-brand-steel">Eastern — no pings in this window</span>
+          <div className="flex-1" />
+          {draft && (
+            <Button size="sm" onClick={save} disabled={busy}>
+              {busy ? 'Saving…' : 'Save settings'}
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

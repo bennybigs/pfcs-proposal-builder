@@ -28,6 +28,7 @@ import {
   todayIso,
 } from '@/components/crm/CardActions';
 import { useSessionEmail } from '@/lib/crm/session';
+import { agingFor, hoursLabel, useCrmSettings, DEFAULT_CRM_SETTINGS, type CrmSettings } from '@/lib/crm/aging';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTeam, memberName, type TeamMember } from '@/lib/crm/api/team';
@@ -37,16 +38,6 @@ import { SOURCE_LABEL, formatDollars, type Contact, type Deal } from '@/lib/crm/
 import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-/** "12m" / "3h" / "5d" — how long this card has been waiting. */
-function age(iso: string): { label: string; hours: number } {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.max(0, Math.floor(ms / 60_000));
-  const hours = mins / 60;
-  if (mins < 60) return { label: `${mins}m`, hours };
-  if (hours < 48) return { label: `${Math.floor(hours)}h`, hours };
-  return { label: `${Math.floor(hours / 24)}d`, hours };
-}
-
 export default function Leads() {
   const { data: contacts = [], isLoading, error } = useContacts();
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
@@ -55,6 +46,7 @@ export default function Leads() {
   const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
   const qc = useQueryClient();
   const badgeCount = useLeadBadge((s) => s.count);
+  const { data: crmSettings = DEFAULT_CRM_SETTINGS } = useCrmSettings();
   const [newLeadOpen, setNewLeadOpen] = useState(false);
 
   // when the badge moves while this page is open (a lead just arrived), refetch
@@ -77,7 +69,15 @@ export default function Leads() {
     [deals, contactById]
   );
   const today = todayIso();
-  const active = leadCards.filter((d) => !d.held_until || d.held_until <= today);
+  const active = leadCards
+    .filter((d) => !d.held_until || d.held_until <= today)
+    .sort((a, b) => {
+      const la = agingFor(a, crmSettings).level;
+      const lb = agingFor(b, crmSettings).level;
+      const w = (l: string) => (l === 'red' ? 0 : l === 'amber' ? 1 : 2);
+      if (w(la) !== w(lb)) return w(la) - w(lb);
+      return b.created_at.localeCompare(a.created_at);
+    });
   const onHold = leadCards.filter((d) => d.held_until && d.held_until > today);
 
   const unassigned = useMemo(
@@ -129,14 +129,14 @@ export default function Leads() {
           {active.length > 0 && (
             <Section title="Lead" hint="untouched — call these first" tone="red">
               {active.map((d) => (
-                <LeadRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} iAmAdmin={iAmAdmin} />
+                <LeadRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} iAmAdmin={iAmAdmin} settings={crmSettings} />
               ))}
             </Section>
           )}
           {onHold.length > 0 && (
             <Section title="On hold" hint="clock paused until the callback date">
               {onHold.map((d) => (
-                <LeadRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} iAmAdmin={iAmAdmin} />
+                <LeadRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} iAmAdmin={iAmAdmin} settings={crmSettings} />
               ))}
             </Section>
           )}
@@ -194,18 +194,20 @@ function LeadRow({
   team,
   me,
   iAmAdmin,
+  settings,
 }: {
   deal: Deal;
   contact: Contact | undefined;
   team: TeamMember[];
   me: string;
   iAmAdmin: boolean;
+  settings: CrmSettings;
 }) {
   const [holdOpen, setHoldOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
 
   if (!contact) return null;
-  const a = age(deal.created_at);
+  const aging = agingFor(deal, settings);
   const held = !!deal.held_until && deal.held_until > todayIso();
   const phoneOk = isValidPhone(contact.phone);
 
@@ -235,13 +237,15 @@ function LeadRow({
           </div>
         </Link>
         <span
-          title={`Waiting ${a.label}`}
+          title={held ? 'Clock paused — on hold' : `Waiting ${hoursLabel(aging.hoursIn)}`}
           className={cn(
             'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-            !held && a.hours >= 4 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-brand-steel'
+            aging.level === 'red' ? 'bg-red-100 text-red-700'
+            : aging.level === 'amber' ? 'bg-amber-100 text-amber-700'
+            : 'bg-gray-100 text-brand-steel'
           )}
         >
-          <Clock className="h-3 w-3" /> {a.label}
+          <Clock className="h-3 w-3" /> {hoursLabel(aging.hoursIn)}
         </span>
       </div>
       {/* the same shared action components the board card and drawer use */}

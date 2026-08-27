@@ -101,7 +101,8 @@ export interface Deal {
   site_address: string;        // the project site (mailing address lives on the contact)
   held_until: string | null;   // On Hold overlay — stage stays put, clock pauses
   hold_note: string | null;
-  reminder_at: string | null;  // per-card reminder override (aging, phase 3)
+  reminder_at: string | null;  // per-card reminder override (replaces the stage clock)
+  aging_notified_at: string | null; // cron marker: "already pinged for this stage entry"
   archived_at: string | null;  // archived cards leave lists but keep everything
   archive_reason: string | null;
   notes: string;

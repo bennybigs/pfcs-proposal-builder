@@ -34,8 +34,10 @@ import {
   HoldDialog,
   LogButton,
   LostDialog,
+  ReminderDialog,
   StageChipControl,
 } from '@/components/crm/CardActions';
+import { agingFor, agingWeight, hoursLabel, useCrmSettings, DEFAULT_CRM_SETTINGS, type Aging } from '@/lib/crm/aging';
 import { formatPhone, isValidPhone, normalizePhone } from '@/lib/crm/phone';
 import { formatDateUS } from '@/lib/format';
 import { useContacts } from '@/lib/crm/api/contacts';
@@ -74,8 +76,10 @@ export default function Pipeline() {
   const { data: team = [] } = useTeam();
   const me = useSessionEmail();
   const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
+  const { data: crmSettings = DEFAULT_CRM_SETTINGS } = useCrmSettings();
   // '' = everyone, '__unassigned__' = nobody, else a member email
   const [assignee, setAssignee] = useState('');
+  const [attentionOnly, setAttentionOnly] = useState(false);
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
   // archived cards/contacts take their deals off the board and out of the numbers
@@ -85,23 +89,41 @@ export default function Pipeline() {
   );
   const quiet = useMemo(() => goneQuietDealIds(activeDeals, activities, tasks), [activeDeals, activities, tasks]);
 
+  // every card's clock, from the shared settings — the same math the cron runs
+  const agingMap = useMemo(() => {
+    const m = new Map<string, Aging>();
+    for (const d of activeDeals) m.set(d.id, agingFor(d, crmSettings));
+    return m;
+  }, [activeDeals, crmSettings]);
+  const attentionCount = useMemo(
+    () => activeDeals.filter((d) => ['amber', 'red'].includes(agingMap.get(d.id)?.level ?? '')).length,
+    [activeDeals, agingMap]
+  );
+
   const visible = useMemo(
     () =>
       activeDeals.filter((d) => {
         if (segment && d.segment !== segment) return false;
+        if (attentionOnly && !['amber', 'red'].includes(agingMap.get(d.id)?.level ?? '')) return false;
         if (assignee === '__unassigned__') return !d.assigned_to;
         if (assignee) return d.assigned_to === assignee;
         return true;
       }),
-    [activeDeals, segment, assignee]
+    [activeDeals, segment, assignee, attentionOnly, agingMap]
   );
   const byStage = useMemo(() => {
     const m = new Map<DealStage, Deal[]>(STAGES.map((s) => [s, []]));
     for (const d of visible) m.get(d.stage)!.push(d);
     for (const list of m.values())
-      list.sort((a, b) => new Date(a.stage_entered_at).getTime() - new Date(b.stage_entered_at).getTime());
+      // red floats to the top of its column, then amber, then oldest-in-stage
+      list.sort((a, b) => {
+        const wa = agingWeight(agingMap.get(a.id)?.level ?? 'ok');
+        const wb = agingWeight(agingMap.get(b.id)?.level ?? 'ok');
+        if (wa !== wb) return wa - wb;
+        return new Date(a.stage_entered_at).getTime() - new Date(b.stage_entered_at).getTime();
+      });
     return m;
-  }, [visible]);
+  }, [visible, agingMap]);
 
   // dashboard strip
   const stats = useMemo(() => {
@@ -161,6 +183,19 @@ export default function Pipeline() {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-brand-black">Pipeline</h1>
+        {attentionCount > 0 && (
+          <button
+            onClick={() => setAttentionOnly(!attentionOnly)}
+            className={cn(
+              'rounded-full border px-2.5 py-1 text-xs font-semibold',
+              attentionOnly
+                ? 'border-red-500 bg-red-100 text-red-700'
+                : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+            )}
+          >
+            ⚠ Needs attention ({attentionCount})
+          </button>
+        )}
         <div className="flex-1" />
         {iAmAdmin && team.length > 1 && (
           <select
@@ -246,6 +281,7 @@ export default function Pipeline() {
                 me={me}
                 iAmAdmin={iAmAdmin}
                 quiet={quiet}
+                agingOf={(id) => agingMap.get(id)}
                 onOpen={(d) => {
                   params.set('deal', d.id);
                   setParams(params, { replace: true });
@@ -280,6 +316,7 @@ function StageColumn({
   me,
   iAmAdmin,
   quiet,
+  agingOf,
   onOpen,
 }: {
   stage: DealStage;
@@ -289,6 +326,7 @@ function StageColumn({
   me: string;
   iAmAdmin: boolean;
   quiet: Set<string>;
+  agingOf: (dealId: string) => Aging | undefined;
   onOpen: (deal: Deal) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
@@ -321,6 +359,7 @@ function StageColumn({
             me={me}
             iAmAdmin={iAmAdmin}
             quiet={quiet.has(d.id)}
+            aging={agingOf(d.id)}
             onOpen={() => onOpen(d)}
           />
         ))}
@@ -341,6 +380,7 @@ function DealCard({
   me,
   iAmAdmin,
   quiet,
+  aging,
   onOpen,
 }: {
   deal: Deal;
@@ -349,16 +389,18 @@ function DealCard({
   me: string;
   iAmAdmin: boolean;
   quiet: boolean;
+  aging: Aging | undefined;
   onOpen: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
-  const days = daysBetween(deal.stage_entered_at);
   const held = !!deal.held_until && deal.held_until > new Date().toISOString().slice(0, 10);
   const phoneOk = contact ? isValidPhone(contact.phone) : false;
   const open = !['won', 'lost'].includes(deal.stage);
   const [holdOpen, setHoldOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const level = aging?.level ?? 'ok';
   return (
     <div
       ref={setNodeRef}
@@ -382,8 +424,21 @@ function DealCard({
           {contact && (
             <Badge variant="outline" className="text-[10px]">{SOURCE_LABEL[contact.source]}</Badge>
           )}
-          <span className="flex items-center gap-0.5 text-brand-steel">
-            <Clock className="h-3 w-3" /> {days}d
+          <span
+            title={
+              level === 'paused' ? 'Clock paused — on hold'
+              : deal.reminder_at ? 'Custom reminder set'
+              : 'Time in current stage'
+            }
+            className={cn(
+              'flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold',
+              level === 'red' ? 'bg-red-100 text-red-700'
+              : level === 'amber' ? 'bg-amber-100 text-amber-700'
+              : 'text-brand-steel'
+            )}
+          >
+            <Clock className="h-3 w-3" /> {hoursLabel(aging?.hoursIn ?? 0)}
+            {deal.reminder_at && <span title="Reminder set">🔔</span>}
           </span>
           {held && deal.held_until && (
             <Badge className="bg-amber-100 text-[10px] text-amber-700 hover:bg-amber-100">
@@ -433,6 +488,7 @@ function DealCard({
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem onClick={onOpen}>Edit / open card</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTaskOpen(true)}>Add task…</DropdownMenuItem>
+            {open && <DropdownMenuItem onClick={() => setRemindOpen(true)}>Set reminder…</DropdownMenuItem>}
             {open && <DropdownMenuItem onClick={() => setHoldOpen(true)}>On hold…</DropdownMenuItem>}
             {open && (
               <DropdownMenuItem className="text-red-600" onClick={() => setLostOpen(true)}>
@@ -452,6 +508,7 @@ function DealCard({
           <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
           <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
           <AddTaskDialog deal={deal} contact={contact} open={taskOpen} onOpenChange={setTaskOpen} />
+          <ReminderDialog deal={deal} contact={contact} open={remindOpen} onOpenChange={setRemindOpen} />
         </>
       )}
     </div>

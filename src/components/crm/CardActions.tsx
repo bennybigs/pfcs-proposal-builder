@@ -770,3 +770,94 @@ export function AddTaskDialog({
     </Dialog>
   );
 }
+
+/** Per-card reminder: replaces the stage clock until the card moves stages. */
+export function ReminderDialog({
+  deal,
+  contact,
+  open,
+  onOpenChange,
+}: {
+  deal: Deal;
+  contact: Contact;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [date, setDate] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setDate(deal.reminder_at ? deal.reminder_at.slice(0, 10) : '');
+  }, [open, deal.reminder_at]);
+
+  const quick = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setDate(d.toISOString().slice(0, 10));
+  };
+
+  const save = async (clear: boolean) => {
+    setBusy(true);
+    try {
+      // remind at 8am Eastern on the chosen day (12:00 UTC)
+      const iso = clear || !date ? null : `${date}T12:00:00.000Z`;
+      await updateDeal(deal.id, { reminder_at: iso, aging_notified_at: null });
+      await logSystem(
+        contact.id,
+        deal.id,
+        iso ? `Reminder set for ${formatDateUS(date)}` : 'Reminder cleared'
+      );
+      qc.invalidateQueries({ queryKey: ['deals'] });
+      toast.success(iso ? `Reminder set — ${formatDateUS(date)}` : 'Reminder cleared',
+        iso ? 'Replaces the stage clock for this card until it moves stages.' : undefined);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error('Could not save reminder', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Remind me about {contact.name}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="flex gap-1.5">
+            {(
+              [
+                [1, 'Tomorrow'],
+                [3, '3 days'],
+                [7, '1 week'],
+              ] as const
+            ).map(([d, l]) => (
+              <button
+                key={d}
+                onClick={() => quick(d)}
+                className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-brand-steel hover:bg-brand-gray-bg"
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs text-brand-steel">Or pick a date</Label>
+            <Input type="date" value={date} min={todayIso()} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          {deal.reminder_at && (
+            <Button variant="outline" onClick={() => save(true)} disabled={busy}>
+              Clear reminder
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => save(false)} disabled={busy || !date}>Set reminder</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
