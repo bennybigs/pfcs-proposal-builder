@@ -17,16 +17,27 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
+import { Clock, MessageSquare, MoreHorizontal, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
 import { DealDrawer } from '@/components/crm/DealDrawer';
+import {
+  AddTaskDialog,
+  AdvanceButton,
+  AssigneePicker,
+  HoldDialog,
+  LogButton,
+  LostDialog,
+  StageChipControl,
+} from '@/components/crm/CardActions';
+import { formatPhone, isValidPhone, normalizePhone } from '@/lib/crm/phone';
+import { formatDateUS } from '@/lib/format';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTeam, memberName } from '@/lib/crm/api/team';
@@ -38,14 +49,17 @@ import {
   OPEN_STAGES,
   SEGMENTS,
   SEGMENT_META,
+  SOURCE_LABEL,
   STAGES,
   STAGE_META,
   daysBetween,
   formatDollars,
+  type Contact,
   type Deal,
   type DealSegment,
   type DealStage,
 } from '@/lib/crm/types';
+import type { TeamMember } from '@/lib/crm/api/team';
 import { cn } from '@/lib/utils';
 
 export default function Pipeline() {
@@ -227,14 +241,15 @@ export default function Pipeline() {
                 key={stage}
                 stage={stage}
                 deals={byStage.get(stage) ?? []}
-                contactName={(id) => contactById.get(id)?.name ?? '—'}
-                assigneeName={(email) => (email ? memberName(team, email) : null)}
+                contactOf={(id) => contactById.get(id)}
+                team={team}
+                me={me}
+                iAmAdmin={iAmAdmin}
                 quiet={quiet}
                 onOpen={(d) => {
                   params.set('deal', d.id);
                   setParams(params, { replace: true });
                 }}
-                onMove={(d, to) => move.mutate({ deal: d, to })}
               />
             ))}
           </div>
@@ -260,19 +275,21 @@ export default function Pipeline() {
 function StageColumn({
   stage,
   deals,
-  contactName,
-  assigneeName,
+  contactOf,
+  team,
+  me,
+  iAmAdmin,
   quiet,
   onOpen,
-  onMove,
 }: {
   stage: DealStage;
   deals: Deal[];
-  contactName: (contactId: string) => string;
-  assigneeName: (email: string | null) => string | null;
+  contactOf: (contactId: string) => Contact | undefined;
+  team: TeamMember[];
+  me: string;
+  iAmAdmin: boolean;
   quiet: Set<string>;
   onOpen: (deal: Deal) => void;
-  onMove: (deal: Deal, to: DealStage) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const total = deals.reduce((n, d) => n + d.value, 0);
@@ -299,11 +316,12 @@ function StageColumn({
           <DealCard
             key={d.id}
             deal={d}
-            contactName={contactName(d.contact_id)}
-            assignee={assigneeName(d.assigned_to)}
+            contact={contactOf(d.contact_id)}
+            team={team}
+            me={me}
+            iAmAdmin={iAmAdmin}
             quiet={quiet.has(d.id)}
             onOpen={() => onOpen(d)}
-            onMove={(to) => onMove(d, to)}
           />
         ))}
       </div>
@@ -311,28 +329,41 @@ function StageColumn({
   );
 }
 
+/**
+ * The card face: every field is directly actionable (stage chip, Advance,
+ * Call/Text/Log, assignee, ⋯) — the same shared components the drawer uses,
+ * so acting here or inside the opened card is the same code path.
+ */
 function DealCard({
   deal,
-  contactName,
-  assignee,
+  contact,
+  team,
+  me,
+  iAmAdmin,
   quiet,
   onOpen,
-  onMove,
 }: {
   deal: Deal;
-  contactName: string;
-  assignee: string | null;
+  contact: Contact | undefined;
+  team: TeamMember[];
+  me: string;
+  iAmAdmin: boolean;
   quiet: boolean;
   onOpen: () => void;
-  onMove: (to: DealStage) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   const days = daysBetween(deal.stage_entered_at);
+  const held = !!deal.held_until && deal.held_until > new Date().toISOString().slice(0, 10);
+  const phoneOk = contact ? isValidPhone(contact.phone) : false;
+  const open = !['won', 'lost'].includes(deal.stage);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [lostOpen, setLostOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
   return (
     <div
       ref={setNodeRef}
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
-      className={cn('rounded-md border bg-white p-2.5 shadow-sm', isDragging && 'opacity-40')}
+      className={cn('rounded-md border bg-white p-2.5 shadow-sm', isDragging && 'opacity-40', held && 'opacity-70')}
     >
       <button
         {...attributes}
@@ -341,16 +372,22 @@ function DealCard({
         className="block w-full cursor-grab text-left active:cursor-grabbing"
       >
         <div className="text-sm font-medium text-brand-black">{deal.title}</div>
-        <div className="mt-0.5 text-xs text-brand-steel">{contactName}</div>
+        <div className="mt-0.5 truncate text-xs text-brand-steel">
+          {contact?.name ?? '—'}
+          {contact?.address ? ` · ${contact.address.split(',').slice(-1)[0].trim()}` : ''}
+        </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-brand-black">{formatDollars(deal.value)}</span>
           <Badge variant="secondary" className="text-[10px]">{SEGMENT_META[deal.segment].short}</Badge>
-          <span className="text-brand-steel">
-            {days}d in stage
+          {contact && (
+            <Badge variant="outline" className="text-[10px]">{SOURCE_LABEL[contact.source]}</Badge>
+          )}
+          <span className="flex items-center gap-0.5 text-brand-steel">
+            <Clock className="h-3 w-3" /> {days}d
           </span>
-          {assignee && (
-            <Badge variant="outline" className="text-[10px]" title={`Assigned to ${assignee}`}>
-              {assignee}
+          {held && deal.held_until && (
+            <Badge className="bg-amber-100 text-[10px] text-amber-700 hover:bg-amber-100">
+              hold → {formatDateUS(deal.held_until)}
             </Badge>
           )}
           {quiet && (
@@ -358,20 +395,65 @@ function DealCard({
           )}
         </div>
       </button>
-      <div className="mt-1.5">
-        <Select value={deal.stage} onValueChange={(v) => onMove(v as DealStage)}>
-          <SelectTrigger className="h-7 text-xs" onClick={(e) => e.stopPropagation()}>
-            <SelectValue placeholder="Move to…" />
-          </SelectTrigger>
-          <SelectContent>
-            {STAGES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {STAGE_META[s].label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* action row — same shared components as the drawer */}
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <StageChipControl deal={deal} contact={contact} />
+        {contact && phoneOk && (
+          <a
+            href={`tel:${normalizePhone(contact.phone)}`}
+            onClick={(e) => e.stopPropagation()}
+            title={`Call ${formatPhone(contact.phone)}`}
+            className="rounded-md border p-1.5 text-brand-steel hover:bg-brand-orange/10 hover:text-brand-orange"
+          >
+            <Phone className="h-3.5 w-3.5" />
+          </a>
+        )}
+        {contact && phoneOk && (
+          <a
+            href={`sms:${normalizePhone(contact.phone)}`}
+            onClick={(e) => e.stopPropagation()}
+            title="Text"
+            className="rounded-md border p-1.5 text-brand-steel hover:bg-brand-orange/10 hover:text-brand-orange"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+          </a>
+        )}
+        {contact && <LogButton deal={deal} contact={contact} label="" size="sm" className="h-7 px-2" />}
+        {open && <AdvanceButton deal={deal} className="h-7 px-2 text-xs" />}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-md border p-1.5 text-brand-steel hover:bg-brand-gray-bg"
+              title="More"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={onOpen}>Edit / open card</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTaskOpen(true)}>Add task…</DropdownMenuItem>
+            {open && <DropdownMenuItem onClick={() => setHoldOpen(true)}>On hold…</DropdownMenuItem>}
+            {open && (
+              <DropdownMenuItem className="text-red-600" onClick={() => setLostOpen(true)}>
+                Mark lost…
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+      {iAmAdmin && (
+        <div className="mt-1.5">
+          <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} className="h-7 w-full" />
+        </div>
+      )}
+      {contact && (
+        <>
+          <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
+          <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
+          <AddTaskDialog deal={deal} contact={contact} open={taskOpen} onOpenChange={setTaskOpen} />
+        </>
+      )}
     </div>
   );
 }

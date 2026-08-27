@@ -3,65 +3,39 @@
 // promotion, no conversion — Advance simply moves the card to Follow Up.
 // On Hold is an overlay (stage stays, clock pauses until the callback date);
 // Lost requires a reason. Admin territory — reps live in My Leads.
+// All row actions are the SHARED CardActions components — identical code
+// paths to the board card face and the opened drawer.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowRight,
-  Clock,
-  MoreHorizontal,
-  PauseCircle,
-  Phone,
-  Plus,
-  UserCheck,
-  XCircle,
-} from 'lucide-react';
+import { Clock, MoreHorizontal, PauseCircle, Phone, Plus, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
 import { NewLeadDialog } from '@/components/crm/NewLeadDialog';
+import {
+  AdvanceButton,
+  AssigneePicker,
+  HoldDialog,
+  LogButton,
+  LostDialog,
+  todayIso,
+} from '@/components/crm/CardActions';
 import { useSessionEmail } from '@/lib/crm/session';
 import { useContacts } from '@/lib/crm/api/contacts';
-import { useDeals, useDealMutations, updateDeal } from '@/lib/crm/api/deals';
+import { useDeals, useDealMutations } from '@/lib/crm/api/deals';
 import { useTeam, memberName, type TeamMember } from '@/lib/crm/api/team';
-import { useLogActivity, logSystem } from '@/lib/crm/api/activities';
-import { useLeadBadge, refreshLeadBadge } from '@/lib/crm/leadBadge';
+import { useLeadBadge } from '@/lib/crm/leadBadge';
 import { formatPhone, isValidPhone, normalizePhone } from '@/lib/crm/phone';
 import { SOURCE_LABEL, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-export const LOST_REASONS = [
-  'Out of area',
-  'No budget',
-  'Wrong service',
-  'Bad contact info',
-  'Duplicate',
-  'Went with someone else',
-  'No response',
-] as const;
 
 /** "12m" / "3h" / "5d" — how long this card has been waiting. */
 function age(iso: string): { label: string; hours: number } {
@@ -72,11 +46,6 @@ function age(iso: string): { label: string; hours: number } {
   if (hours < 48) return { label: `${Math.floor(hours)}h`, hours };
   return { label: `${Math.floor(hours / 24)}d`, hours };
 }
-
-const todayIso = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 export default function Leads() {
   const { data: contacts = [], isLoading, error } = useContacts();
@@ -232,9 +201,6 @@ function LeadRow({
   me: string;
   iAmAdmin: boolean;
 }) {
-  const log = useLogActivity();
-  const { move, assign } = useDealMutations();
-  const qc = useQueryClient();
   const [holdOpen, setHoldOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
 
@@ -242,49 +208,6 @@ function LeadRow({
   const a = age(deal.created_at);
   const held = !!deal.held_until && deal.held_until > todayIso();
   const phoneOk = isValidPhone(contact.phone);
-
-  const logCall = async () => {
-    try {
-      await log.mutateAsync({
-        contact_id: contact.id,
-        deal_id: deal.id,
-        type: 'call',
-        direction: 'outbound',
-        body: 'Called from Leads inbox',
-      });
-      toast.success('Call logged');
-    } catch (err) {
-      toast.error('Could not log call', err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const advance = async () => {
-    try {
-      await move.mutateAsync({ deal, to: 'follow_up' });
-      void refreshLeadBadge();
-      toast.success('Moved to Follow Up', `${contact.name} is on the board.`);
-    } catch (err) {
-      toast.error('Could not advance', err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const assignLead = async (toEmail: string) => {
-    const target = toEmail || null;
-    try {
-      await assign.mutateAsync({
-        deal,
-        toEmail: target,
-        assigneeName: memberName(team, target),
-        byName: memberName(team, me),
-      });
-      toast.success(
-        target ? `Assigned to ${memberName(team, target)}` : 'Unassigned',
-        target && target !== me ? 'Their phone gets a buzz and an email.' : undefined
-      );
-    } catch (err) {
-      toast.error('Could not assign', err instanceof Error ? err.message : String(err));
-    }
-  };
 
   return (
     <div className="border-b px-4 py-3 last:border-b-0">
@@ -294,7 +217,7 @@ function LeadRow({
             <span className="truncate font-medium text-brand-black">{contact.name}</span>
             <Badge variant="outline" className="text-[10px]">
               {SOURCE_LABEL[contact.source]}
-              {contact.source_detail ? ` · ${contact.source_detail}` : ''}
+              {contact.source_detail ? ` \u00b7 ${contact.source_detail}` : ''}
             </Badge>
             {held && deal.held_until && (
               <span className="flex items-center gap-1 text-[11px] text-brand-steel">
@@ -308,7 +231,7 @@ function LeadRow({
           <div className="mt-0.5 truncate text-xs text-brand-steel">
             {[phoneOk ? formatPhone(contact.phone) : contact.phone, contact.email, contact.address]
               .filter(Boolean)
-              .join(' · ')}
+              .join(' \u00b7 ')}
           </div>
         </Link>
         <span
@@ -321,6 +244,7 @@ function LeadRow({
           <Clock className="h-3 w-3" /> {a.label}
         </span>
       </div>
+      {/* the same shared action components the board card and drawer use */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {phoneOk && (
           <Button asChild variant="outline" size="sm" className="h-8">
@@ -329,34 +253,12 @@ function LeadRow({
             </a>
           </Button>
         )}
-        <Button variant="outline" size="sm" className="h-8" onClick={logCall} disabled={log.isPending}>
-          <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Log call
-        </Button>
-        <Button size="sm" className="h-8" onClick={advance} disabled={move.isPending}>
-          Advance <ArrowRight className="ml-1 h-3.5 w-3.5" />
-        </Button>
+        <LogButton deal={deal} contact={contact} />
+        <AdvanceButton deal={deal} />
         <Button variant="outline" size="sm" className="h-8" onClick={() => setHoldOpen(true)}>
           <PauseCircle className="mr-1.5 h-3.5 w-3.5" /> Hold
         </Button>
-        {iAmAdmin && (
-          <select
-            value={deal.assigned_to ?? ''}
-            disabled={assign.isPending}
-            onChange={(e) => void assignLead(e.target.value)}
-            title="Who owns this lead"
-            className={cn(
-              'h-8 cursor-pointer rounded-md border bg-white px-2 text-xs',
-              deal.assigned_to ? 'text-brand-black' : 'text-brand-steel'
-            )}
-          >
-            <option value="">Assign to…</option>
-            {team.map((t) => (
-              <option key={t.email} value={t.email}>
-                {t.display_name || t.email}
-              </option>
-            ))}
-          </select>
-        )}
+        <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 px-2">
@@ -368,155 +270,15 @@ function LeadRow({
               <Link to={`/crm/contacts/${contact.id}`}>Open contact</Link>
             </DropdownMenuItem>
             <DropdownMenuItem className="text-red-600" onClick={() => setLostOpen(true)}>
-              <XCircle className="mr-1.5 h-3.5 w-3.5" /> Mark lost…
+              <XCircle className="mr-1.5 h-3.5 w-3.5" /> Mark lost\u2026
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen}
-        onDone={() => { qc.invalidateQueries({ queryKey: ['deals'] }); void refreshLeadBadge(); }} />
+      <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
       <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
     </div>
-  );
-}
-
-/** On Hold is an overlay: the card keeps its stage, the clock pauses. */
-function HoldDialog({
-  deal,
-  contact,
-  open,
-  onOpenChange,
-  onDone,
-}: {
-  deal: Deal;
-  contact: Contact;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  onDone: () => void;
-}) {
-  const [date, setDate] = useState('');
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setDate(deal.held_until ?? '');
-      setNote(deal.hold_note ?? '');
-    }
-  }, [open, deal.held_until, deal.hold_note]);
-
-  const save = async () => {
-    if (!date) {
-      toast.error('Pick a callback date', 'On hold requires a date to come back on.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await updateDeal(deal.id, { held_until: date, hold_note: note.trim() || null });
-      await logSystem(contact.id, deal.id, `On hold until ${formatDateUS(date)}${note.trim() ? ` — ${note.trim()}` : ''}`);
-      toast.success('On hold', `Resurfaces ${formatDateUS(date)} with a red counter.`);
-      onOpenChange(false);
-      onDone();
-    } catch (err) {
-      toast.error('Could not save', err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Put {contact.name} on hold</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <Label className="text-xs text-brand-steel">Call back on (required)</Label>
-            <Input type="date" value={date} min={todayIso()} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs text-brand-steel">Why (goes on the timeline)</Label>
-            <Input value={note} placeholder='e.g. "call back after harvest"' onChange={(e) => setNote(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={busy || !date}>Put on hold</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** Lost requires a reason; the card stays searchable and revivable. */
-function LostDialog({
-  deal,
-  contact,
-  open,
-  onOpenChange,
-}: {
-  deal: Deal;
-  contact: Contact;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const { move } = useDealMutations();
-  const [reason, setReason] = useState('');
-  const [detail, setDetail] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setReason('');
-      setDetail('');
-    }
-  }, [open]);
-
-  const save = async () => {
-    if (!reason) return;
-    try {
-      const full = detail.trim() ? `${reason} — ${detail.trim()}` : reason;
-      await move.mutateAsync({ deal, to: 'lost', lostReason: full });
-      void refreshLeadBadge();
-      toast.success('Marked lost', 'Kept forever — reopen it any time from the board filters.');
-      onOpenChange(false);
-    } catch (err) {
-      toast.error('Could not save', err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Mark {contact.name} lost</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <Label className="text-xs text-brand-steel">Reason (required)</Label>
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger><SelectValue placeholder="Pick a reason…" /></SelectTrigger>
-              <SelectContent>
-                {LOST_REASONS.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs text-brand-steel">Detail (optional)</Label>
-            <Input value={detail} placeholder="anything future-you should know" onChange={(e) => setDetail(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" className="text-red-600 hover:bg-red-50" onClick={save} disabled={!reason}>
-            Mark lost
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -58,6 +58,15 @@ import {
 } from '@/lib/crm/api/activities';
 import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/lib/crm/session';
+import {
+  AdvanceButton,
+  AssigneePicker,
+  HoldDialog,
+  LogButton,
+  LostDialog,
+  StageChipControl,
+  WonDialog,
+} from '@/components/crm/CardActions';
 import { useProposalStore } from '@/store/useProposalStore';
 import { grandTotal } from '@/lib/pricing';
 import { formatPhone, isValidPhone, normalizePhone } from '@/lib/crm/phone';
@@ -143,9 +152,24 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
-  const [lostReason, setLostReason] = useState('');
-  const [lostTo, setLostTo] = useState('');
+  const [wonOpen, setWonOpen] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [logForceOpen, setLogForceOpen] = useState(false);
+  const pendingCallAt = useRef<number | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  // the honest call log: tapping Call fires tel:, and when the app regains
+  // focus we offer the log card (never forced — Dismiss discards silently)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && pendingCallAt.current) {
+        pendingCallAt.current = null;
+        setLogForceOpen(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   // re-seed the form when a different deal opens, or fresh data arrives while
   // the form is clean — never while the user has unsaved edits
@@ -251,19 +275,6 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
     }
   };
 
-  const outcome = async (to: DealStage, reason?: string, lostToVal?: string) => {
-    try {
-      await move.mutateAsync({ deal, to, lostReason: reason });
-      if (to === 'lost' && lostToVal?.trim()) {
-        await updateDeal.mutateAsync({ id: deal.id, patch: { lost_to: lostToVal.trim() } });
-      }
-      toast.success(to === 'won' ? 'Marked won 🎉' : 'Marked lost');
-      onClose();
-    } catch (err) {
-      toast.error('Could not update deal', err instanceof Error ? err.message : String(err));
-    }
-  };
-
   const useTotal = async (total: number) => {
     await updateDeal.mutateAsync({ id: deal.id, patch: { value: Math.round(total) } });
     if (contact) await logSystem(contact.id, deal.id, `Value: ${formatDollars(deal.value)} → ${formatDollars(total)} (from proposal)`);
@@ -282,9 +293,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
         </SheetHeader>
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STAGE_META[deal.stage].color}`}>
-            {STAGE_META[deal.stage].label}
-          </span>
+          <StageChipControl deal={deal} contact={contact} />
+          {open && <AdvanceButton deal={deal} className="h-6 px-2 text-xs" />}
           {contact && (
             <Link to={`/crm/contacts/${contact.id}`} className="text-brand-orange hover:underline">
               {contact.name}
@@ -305,9 +315,9 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               {phoneOk ? (
                 <a
                   href={`tel:${normalizePhone(contact.phone)}`}
-                  onClick={() =>
-                    log.mutate({ contact_id: contact.id, deal_id: deal.id, type: 'call', direction: 'outbound', body: `Called ${formatPhone(contact.phone)}` })
-                  }
+                  onClick={() => {
+                    pendingCallAt.current = Date.now(); // offer the log card on return
+                  }}
                 >
                   <Phone className="mr-1.5 h-4 w-4" /> Call
                 </a>
@@ -317,12 +327,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             </Button>
             <Button asChild={phoneOk} size="sm" variant="outline" className="flex-1" disabled={!phoneOk}>
               {phoneOk ? (
-                <a
-                  href={`sms:${normalizePhone(contact.phone)}`}
-                  onClick={() =>
-                    log.mutate({ contact_id: contact.id, deal_id: deal.id, type: 'text', direction: 'outbound', body: `Texted ${formatPhone(contact.phone)}` })
-                  }
-                >
+                <a href={`sms:${normalizePhone(contact.phone)}`}>
                   <MessageSquare className="mr-1.5 h-4 w-4" /> Text
                 </a>
               ) : (
@@ -341,6 +346,14 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 </a>
               </Button>
             )}
+            <LogButton
+              deal={deal}
+              contact={contact}
+              className="flex-1"
+              forceOpen={logForceOpen}
+              onForceHandled={() => setLogForceOpen(false)}
+              initialType="call"
+            />
             {!phoneOk && (
               <button
                 className="w-full text-left text-xs font-medium text-brand-orange underline-offset-2 hover:underline"
@@ -458,52 +471,12 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
           {/* live controls (they log + notify on their own, outside Save) */}
           <Field label="Assigned to">
-            {iAmAdmin ? (
-              <Select
-                value={deal.assigned_to ?? UNASSIGNED}
-                onValueChange={(v) => {
-                  const toEmail = v === UNASSIGNED ? null : v;
-                  assign.mutate(
-                    { deal, toEmail, assigneeName: memberName(team, toEmail), byName: memberName(team, me) },
-                    {
-                      onSuccess: () => toast.success(toEmail ? `Assigned to ${memberName(team, toEmail)}` : 'Unassigned'),
-                      onError: (err) => toast.error('Could not assign', err instanceof Error ? err.message : String(err)),
-                    }
-                  );
-                }}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                  {team.map((t) => (
-                    <SelectItem key={t.email} value={t.email}>{t.display_name || t.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input value={memberName(team, deal.assigned_to)} disabled />
-            )}
+            <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} className="h-9 w-full" />
             {deal.closed_by && (
               <p className="text-xs text-brand-steel">
                 Closed by {memberName(team, deal.closed_by)} — locked in when the deal was won.
               </p>
             )}
-          </Field>
-          <Field label="Stage">
-            <Select
-              value={deal.stage}
-              onValueChange={(v) => {
-                if (v === 'lost') setLostOpen(true);
-                else move.mutate({ deal, to: v as DealStage });
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STAGES.map((s) => (
-                  <SelectItem key={s} value={s}>{STAGE_META[s].label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </Field>
         </div>
 
@@ -575,14 +548,23 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           />
         )}
 
+        {/* terminal outcomes — visually separated from the flow, both confirmed */}
         {open && (
-          <div className="mt-6 flex gap-2">
-            <Button className="flex-1" onClick={() => outcome('won')}>
-              <Trophy className="mr-1.5 h-4 w-4" /> Won
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={() => setLostOpen(true)}>
-              <X className="mr-1.5 h-4 w-4" /> Lost
-            </Button>
+          <div className="mt-6 border-t pt-4">
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-steel">
+              Outcome
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => setWonOpen(true)}>
+                <Trophy className="mr-1.5 h-4 w-4" /> Won…
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setLostOpen(true)}>
+                <X className="mr-1.5 h-4 w-4" /> Lost…
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setHoldOpen(true)}>
+                Hold…
+              </Button>
+            </div>
           </div>
         )}
 
@@ -627,36 +609,13 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={lostOpen} onOpenChange={setLostOpen}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Mark as lost</DialogTitle>
-            </DialogHeader>
-            <Field label="Why? (required)">
-              <Input
-                value={lostReason}
-                placeholder="price, timing, went dark…"
-                onChange={(e) => setLostReason(e.target.value)}
-                autoFocus
-              />
-            </Field>
-            <Field label="Lost to (competitor / their price — optional)">
-              <Input value={lostTo} placeholder="Morton @ $210k" onChange={(e) => setLostTo(e.target.value)} />
-            </Field>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setLostOpen(false)}>Cancel</Button>
-              <Button
-                disabled={!lostReason.trim()}
-                onClick={() => {
-                  setLostOpen(false);
-                  outcome('lost', lostReason.trim(), lostTo);
-                }}
-              >
-                Mark lost
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {contact && (
+          <>
+            <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
+            <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
+          </>
+        )}
+        <WonDialog deal={deal} open={wonOpen} onOpenChange={setWonOpen} />
       </SheetContent>
     </Sheet>
   );
