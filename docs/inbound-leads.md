@@ -39,10 +39,12 @@ is required** — everything else is optional.
 ## What happens on our side
 
 - If the email (or phone) matches an existing customer, **no duplicate is
-  created** — a new deal is added to that person and your campaign is noted on
+  created** — a new card is added to that person and your campaign is noted on
   their timeline. Their existing name/address is never overwritten.
 - Otherwise a new contact is created with your `source`/`source_detail`
-  stamped, plus a deal in the first pipeline stage ("Inquiry").
+  stamped, plus a pipeline card at the first stage ("Lead"). The `message`
+  text is pinned to the card as the customer's original inquiry note, and
+  our sales team is notified on their phones the moment the lead lands.
 - Every call, success or failure, is logged on our side with its payload — if
   numbers ever disagree, we can reconcile to the request.
 

@@ -13,6 +13,7 @@ import Pipeline from '@/pages/crm/Pipeline';
 import Tasks from '@/pages/crm/Tasks';
 import Team from '@/pages/crm/Team';
 const Reports = lazy(() => import('@/pages/crm/Reports'));
+const PublicDocs = lazy(() => import('@/pages/PublicDocs'));
 const InboundLeadsDoc = lazy(() => import('@/pages/crm/InboundLeadsDoc'));
 const Integrations = lazy(() => import('@/pages/crm/Integrations'));
 import { Toaster } from '@/components/ui/toast';
@@ -33,6 +34,15 @@ export default function App() {
         <Route path="/proposal/:id" element={<BuilderGate><Editor /></BuilderGate>} />
         {/* customer share links stay open — no account, no gate */}
         <Route path="/view" element={<CustomerView />} />
+        {/* public integrator docs — the link we hand the marketing company */}
+        <Route
+          path="/docs/inbound-leads"
+          element={
+            <Suspense fallback={<p className="p-8 text-sm text-brand-steel">Loading…</p>}>
+              <PublicDocs />
+            </Suspense>
+          }
+        />
         <Route path="/library" element={<BuilderGate><LibraryEditor /></BuilderGate>} />
         <Route path="/settings" element={<BuilderGate><Settings /></BuilderGate>} />
         <Route path="/crm" element={<CrmLayout />}>
