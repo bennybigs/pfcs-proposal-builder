@@ -4,7 +4,6 @@
 //
 //   StageChipControl — tap the stage chip, pick any stage; Won/Lost separated
 //                      behind confirms (Won asks final value; Lost a reason)
-//   AdvanceButton    — one tap to the next stage (the common case)
 //   LogButton        — log a call / text / note without opening anything;
 //                      connected call on a Lead offers "move to Follow Up";
 //                      bad number / wrong person offers an inline phone fix
@@ -12,7 +11,7 @@
 //   HoldDialog, LostDialog, WonDialog — shared everywhere
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, ChevronDown, ClipboardList } from 'lucide-react';
+import { ChevronDown, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,13 +75,6 @@ export const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** Next stage in the flow, or null when only terminal outcomes remain. */
-export function nextStage(stage: DealStage): DealStage | null {
-  const i = NON_TERMINAL.indexOf(stage);
-  if (i === -1) return null;
-  return i + 1 < NON_TERMINAL.length ? NON_TERMINAL[i + 1] : 'won';
-}
-
 // ── stage chip: tap it, pick any stage ───────────────────────────────
 
 export function StageChipControl({ deal, contact }: { deal: Deal; contact: Contact | undefined }) {
@@ -138,47 +130,6 @@ export function StageChipControl({ deal, contact }: { deal: Deal; contact: Conta
       </DropdownMenu>
       <WonDialog deal={deal} open={wonOpen} onOpenChange={setWonOpen} />
       {contact && <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />}
-    </>
-  );
-}
-
-// ── Advance → : the common case in one tap ───────────────────────────
-
-export function AdvanceButton({
-  deal,
-  size = 'sm',
-  className,
-}: {
-  deal: Deal;
-  size?: 'sm' | 'default';
-  className?: string;
-}) {
-  const { move } = useDealMutations();
-  const [wonOpen, setWonOpen] = useState(false);
-  const next = nextStage(deal.stage);
-  if (!next) return null;
-
-  const go = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (next === 'won') {
-      setWonOpen(true);
-      return;
-    }
-    try {
-      await move.mutateAsync({ deal, to: next });
-      void refreshLeadBadge();
-      toast.success(`Moved to ${STAGE_META[next].label}`);
-    } catch (err) {
-      toast.error('Could not advance', err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  return (
-    <>
-      <Button size={size} className={cn('h-8', className)} onClick={go} disabled={move.isPending}>
-        {next === 'won' ? 'Won' : 'Advance'} <ArrowRight className="ml-1 h-3.5 w-3.5" />
-      </Button>
-      <WonDialog deal={deal} open={wonOpen} onOpenChange={setWonOpen} />
     </>
   );
 }

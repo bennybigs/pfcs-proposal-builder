@@ -59,7 +59,6 @@ import {
 import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/lib/crm/session';
 import {
-  AdvanceButton,
   AssigneePicker,
   HoldDialog,
   LogButton,
@@ -294,7 +293,6 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
           <StageChipControl deal={deal} contact={contact} />
-          {open && <AdvanceButton deal={deal} className="h-6 px-2 text-xs" />}
           {contact && (
             <Link to={`/crm/contacts/${contact.id}`} className="text-brand-orange hover:underline">
               {contact.name}

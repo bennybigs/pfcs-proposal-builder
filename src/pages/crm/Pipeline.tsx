@@ -29,7 +29,6 @@ import { toast } from '@/components/ui/toast';
 import { DealDrawer } from '@/components/crm/DealDrawer';
 import {
   AddTaskDialog,
-  AdvanceButton,
   AssigneePicker,
   HoldDialog,
   LogButton,
@@ -478,7 +477,6 @@ function DealCard({
           </a>
         )}
         {contact && <LogButton deal={deal} contact={contact} label="" size="sm" className="h-7 px-2" />}
-        {open && <AdvanceButton deal={deal} className="h-7 px-2 text-xs" />}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

@@ -20,7 +20,6 @@ import {
 import { toast } from '@/components/ui/toast';
 import { NewLeadDialog } from '@/components/crm/NewLeadDialog';
 import {
-  AdvanceButton,
   AssigneePicker,
   HoldDialog,
   LogButton,
@@ -106,10 +105,9 @@ export default function Leads() {
       </div>
       <p className="mt-1 text-sm text-brand-steel">
         New inquiries waiting on a first move — the same cards that run the pipeline, sitting at
-        the <span className="font-medium">Lead</span> stage. Call fast, then{' '}
-        <span className="font-medium">Advance</span> to Follow Up, put{' '}
-        <span className="font-medium">On hold</span> with a callback date, or mark it lost. This
-        list should trend toward empty.
+        the <span className="font-medium">Lead</span> stage. Call fast, then tap the stage chip
+        to move them along, put them <span className="font-medium">On hold</span> with a callback
+        date, or mark them lost. This list should trend toward empty.
       </p>
 
       {error ? (
@@ -258,7 +256,6 @@ function LeadRow({
           </Button>
         )}
         <LogButton deal={deal} contact={contact} />
-        <AdvanceButton deal={deal} />
         <Button variant="outline" size="sm" className="h-8" onClick={() => setHoldOpen(true)}>
           <PauseCircle className="mr-1.5 h-3.5 w-3.5" /> Hold
         </Button>
