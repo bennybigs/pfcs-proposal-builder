@@ -1,6 +1,7 @@
 import type { CompanySnapshot, Proposal } from '@/types';
 import { Markdown } from '@/components/Markdown';
 import { AcceptanceBlock } from '@/components/customer/AcceptanceBlock';
+import { StandardTerms } from '@/components/customer/StandardTerms';
 import { cardDisplayPrice, proposalPricing } from '@/lib/pricing';
 import { addDays, formatCurrency, formatDateLong } from '@/lib/format';
 import { PROPOSAL_VALID_DAYS } from '@/constants/defaults';
@@ -195,8 +196,12 @@ export function CustomerProposal({
         </div>
       )}
 
-      {/* Acceptance — always last, never removable */}
+      {/* Acceptance — always follows the body, never removable */}
       <AcceptanceBlock />
+
+      {/* Standard Terms and Conditions — attached to every proposal, with
+          the acceptance grid and both Notice of Cancellation copies */}
+      <StandardTerms company={company} />
 
       <footer className="mt-8 border-t border-brand-gray-light pt-4 text-center text-xs text-brand-steel">
         {company.companyName}

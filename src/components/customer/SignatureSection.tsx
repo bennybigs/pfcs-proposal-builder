@@ -141,8 +141,9 @@ export function SignatureSection({
             onChange={(e) => setConsent(e.target.checked)}
           />
           <span>
-            I agree to conduct this transaction electronically and intend my typed name to serve as
-            my signature accepting this proposal.
+            I have read this proposal and the attached Standard Terms and Conditions of
+            Construction. I agree to conduct this transaction electronically and intend my typed
+            name to serve as my signature accepting both.
           </span>
         </label>
         {errorMsg && <p className="text-sm font-medium text-red-600">{errorMsg}</p>}
