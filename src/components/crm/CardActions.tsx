@@ -640,6 +640,7 @@ export function WonDialog({
           <Input
             inputMode="numeric"
             value={finalValue}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => setFinalValue(e.target.value.replace(/[^\d]/g, ''))}
             autoFocus
           />

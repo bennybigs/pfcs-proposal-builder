@@ -440,6 +440,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               <Input
                 inputMode="numeric"
                 value={draft.value}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => set({ value: e.target.value.replace(/[^\d]/g, '') })}
               />
             </Field>
@@ -452,6 +453,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               <Input
                 inputMode="numeric"
                 value={draft.probability}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => set({ probability: e.target.value.replace(/[^\d]/g, '') })}
               />
             </Field>
