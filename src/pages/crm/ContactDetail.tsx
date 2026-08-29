@@ -252,8 +252,10 @@ export default function ContactDetail() {
           <div className="mt-2 grid gap-2">
             {deals.map((d) => {
               const isOpen = !['won', 'lost'].includes(d.stage);
+              const dealProposals = proposalLinks.filter((pl) => pl.deal_id === d.id);
               return (
-                <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                <div key={d.id} className="rounded-md border px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
                   <Link
                     to={`/crm/pipeline?deal=${d.id}`}
                     className="flex min-w-0 flex-1 flex-wrap items-center gap-2 hover:opacity-80"
@@ -302,33 +304,32 @@ export default function ContactDetail() {
                     </Badge>
                   ) : null}
                 </div>
+                {/* a deal IS the working project — its proposals live inside it */}
+                {dealProposals.length > 0 && (
+                  <div className="mt-1.5 grid gap-1 border-t pt-1.5">
+                    {dealProposals.map((pl) => (
+                      <div key={pl.id} className="flex flex-wrap items-center gap-2 pl-4 text-xs">
+                        <FileText className="h-3 w-3 shrink-0 text-brand-steel" />
+                        <span className="min-w-0 flex-1 truncate font-medium">{pl.title || 'Proposal'}</span>
+                        <span className="text-brand-steel">{formatDollars(pl.total)}</span>
+                        <Link
+                          to={`/crm/pipeline?deal=${d.id}`}
+                          className="text-brand-orange hover:underline"
+                        >
+                          Open in deal
+                        </Link>
+                        {pl.share_url && (
+                          <a href={pl.share_url} target="_blank" rel="noreferrer" className="text-brand-orange hover:underline">
+                            Customer link
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {proposalLinks.length > 0 && (
-        <div className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-brand-black">Proposals</h2>
-          <div className="mt-2 grid gap-2">
-            {proposalLinks.map((pl) => (
-              <div key={pl.id} className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                <FileText className="h-3.5 w-3.5 text-brand-steel" />
-                <span className="font-medium">{pl.title || 'Proposal'}</span>
-                <span className="text-brand-steel">{formatDollars(pl.total)}</span>
-                {pl.share_url && (
-                  <a
-                    href={pl.share_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ml-auto text-brand-orange hover:underline"
-                  >
-                    Open
-                  </a>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       )}
