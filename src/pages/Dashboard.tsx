@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Archive, Copy, FileSignature, FileUp, Link2 as LinkIcon, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Archive, Copy, FileSignature, Link2 as LinkIcon, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { Button } from '@/components/ui/button';
@@ -32,14 +32,12 @@ export default function Dashboard() {
   const proposals = useProposalStore((s) => s.proposals);
   const deleteProposal = useProposalStore((s) => s.deleteProposal);
   const duplicateProposal = useProposalStore((s) => s.duplicateProposal);
-  const importProposal = useProposalStore((s) => s.importProposal);
   const updateProposal = useProposalStore((s) => s.updateProposal);
   const archiveProposal = useProposalStore((s) => s.archiveProposal);
   const restoreProposal = useProposalStore((s) => s.restoreProposal);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Proposal | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // deleted proposals live on as tombstones so the deletion can sync — they
   // are never shown anywhere
@@ -50,20 +48,6 @@ export default function Dashboard() {
   const list = active.filter((p) => p.status !== 'contract');
   const contracts = active.filter((p) => p.status === 'contract');
   const archived = all.filter((p) => p.archivedAt);
-
-  const handleImportFile = async (file: File) => {
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as Proposal;
-      if (!parsed || !Array.isArray(parsed.cards) || !parsed.customer) {
-        throw new Error('Not a valid proposal JSON file');
-      }
-      const imported = importProposal(parsed);
-      navigate(`/proposal/${imported.id}`);
-    } catch (err) {
-      toast.error('Could not import proposal', err instanceof Error ? err.message : String(err));
-    }
-  };
 
   const renderGrid = (items: Proposal[]) => (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -168,28 +152,7 @@ export default function Dashboard() {
       />
 
       <main className="mx-auto max-w-[1800px] px-4 py-8">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleImportFile(f);
-            e.target.value = '';
-          }}
-        />
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-wide">Proposals</h1>
-          <Button
-            variant="outline"
-            size="sm"
-            title="Restore a proposal from a JSON backup file (Export → Proposal JSON in the editor)"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <FileUp className="h-4 w-4" /> Import backup
-          </Button>
-        </div>
+        <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">Proposals</h1>
 
         {list.length === 0 && contracts.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-brand-gray-light bg-white p-16 text-center">
