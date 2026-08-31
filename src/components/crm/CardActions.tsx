@@ -79,8 +79,11 @@ export const todayIso = () => {
 
 export function StageChipControl({ deal, contact }: { deal: Deal; contact: Contact | undefined }) {
   const { move } = useDealMutations();
+  const qc = useQueryClient();
   const [wonOpen, setWonOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const held = !!deal.held_until && deal.held_until > todayIso();
 
   const to = async (s: DealStage) => {
     try {
@@ -126,10 +129,40 @@ export function StageChipControl({ deal, contact }: { deal: Deal; contact: Conta
           >
             ✕ Lost…
           </DropdownMenuItem>
+          {/* Hold isn't a stage — it pauses the card wherever it sits — but it
+              belongs in the same menu so this chip is the ONE status control */}
+          {held ? (
+            <DropdownMenuItem
+              onClick={async () => {
+                if (!contact) return;
+                try {
+                  await releaseHold(deal, contact);
+                  qc.invalidateQueries({ queryKey: ['deals'] });
+                  toast.success('Hold released');
+                } catch (err) {
+                  toast.error('Could not release', err instanceof Error ? err.message : String(err));
+                }
+              }}
+            >
+              ▶ Release hold
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              disabled={['won', 'lost'].includes(deal.stage)}
+              onClick={() => setHoldOpen(true)}
+            >
+              ⏸ On hold…
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <WonDialog deal={deal} open={wonOpen} onOpenChange={setWonOpen} />
-      {contact && <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />}
+      {contact && (
+        <>
+          <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
+          <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
+        </>
+      )}
     </>
   );
 }

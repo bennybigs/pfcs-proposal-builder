@@ -24,13 +24,12 @@ import { useContactMutations, useContacts } from '@/lib/crm/api/contacts';
 import { normalizePhone } from '@/lib/crm/phone';
 import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import {
-  LEAD_STATUSES,
-  LEAD_STATUS_META,
+  CONTACT_TYPES,
+  CONTACT_TYPE_LABEL,
   SOURCES,
   SOURCE_LABEL,
   type Contact,
   type ContactSource,
-  type LeadStatus,
 } from '@/lib/crm/types';
 
 interface Props {
@@ -50,7 +49,7 @@ const empty = {
   source_detail: '',
   tags: '' as string, // comma-separated in the form
   notes: '',
-  lead_status: 'new' as LeadStatus, // new contacts land in the Leads inbox by default
+  type: 'customer', // what they are to us — status lives on the deal
 };
 
 /** Collapse runs of whitespace, trim ends — casing preserved. */
@@ -74,7 +73,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
             source_detail: contact.source_detail ?? '',
             tags: contact.tags.join(', '),
             notes: contact.notes,
-            lead_status: contact.lead_status,
+            type: contact.type || 'customer',
           }
         : empty
     );
@@ -91,9 +90,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
     source_detail: cleanDetail(form.source_detail) || null,
     tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
     notes: form.notes,
-    lead_status: form.lead_status,
-    // switching away from on-hold clears the resurface date
-    lead_hold_until: form.lead_status === 'on_hold' ? (contact?.lead_hold_until ?? null) : null,
+    type: form.type,
   });
 
   const save = async () => {
@@ -166,18 +163,15 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
               onChange={(v) => set({ source_detail: v })}
             />
           </Field>
-          <Field label="Lead stage — New shows in the Leads inbox">
-            <Select
-              value={form.lead_status}
-              onValueChange={(v) => set({ lead_status: v as LeadStatus })}
-            >
+          <Field label="Type — what they are to us (pipeline status lives on the deal)">
+            <Select value={form.type} onValueChange={(v) => set({ type: v })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {LEAD_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {LEAD_STATUS_META[s].label}
+                {CONTACT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {CONTACT_TYPE_LABEL[t]}
                   </SelectItem>
                 ))}
               </SelectContent>

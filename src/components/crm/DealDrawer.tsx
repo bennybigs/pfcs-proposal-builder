@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
-import { useDealMutations } from '@/lib/crm/api/deals';
+import { useDealMutations, useContactDeals } from '@/lib/crm/api/deals';
 import { useContactMutations } from '@/lib/crm/api/contacts';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useDealProposalLinks, setCountsTowardValue } from '@/lib/crm/api/proposalLinks';
@@ -148,6 +148,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const location = useLocation();
   const { data: links = [] } = useDealProposalLinks(deal ? [deal.id] : []);
   const { data: activities = [] } = useContactActivities(contact?.id);
+  const { data: contactDeals = [] } = useContactDeals(contact?.id);
   const localProposals = useProposalStore((s) => s.proposals);
   const settings = useLibraryStore((s) => s.settings);
 
@@ -194,6 +195,9 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   }, [deal?.id, contact, deal?.updated_at]);
 
   const phoneOk = !!contact && isValidPhone(contact.phone);
+  const held = !!deal?.held_until && deal.held_until > new Date().toISOString().slice(0, 10);
+  // derived, never typed in: they've won work with us before
+  const isRepeatCustomer = contactDeals.some((d: Deal) => d.id !== deal?.id && d.stage === 'won');
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['contacts'] });
@@ -323,6 +327,17 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
           <StageChipControl deal={deal} contact={contact} />
+          {held && deal.held_until && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+              On hold → {formatDateUS(deal.held_until)}
+            </span>
+          )}
+          {/* the job carries the fact that this customer has bought before */}
+          {isRepeatCustomer && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+              Repeat customer
+            </span>
+          )}
           {contact && (
             <Link to={`/crm/contacts/${contact.id}`} className="text-brand-orange hover:underline">
               {contact.name}
@@ -600,25 +615,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           />
         )}
 
-        {/* terminal outcomes — visually separated from the flow, both confirmed */}
-        {open && (
-          <div className="mt-6 border-t pt-4">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-steel">
-              Outcome
-            </div>
-            <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => setWonOpen(true)}>
-                <Trophy className="mr-1.5 h-4 w-4" /> Won…
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setLostOpen(true)}>
-                <X className="mr-1.5 h-4 w-4" /> Lost…
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setHoldOpen(true)}>
-                Hold…
-              </Button>
-            </div>
-          </div>
-        )}
+        {/* No second set of status buttons — the stage chip at the top is the
+            one control for stage, Won, Lost, and Hold alike. */}
 
         {/* sticky Save/Cancel bar — appears only when there are unsaved edits */}
         {dirty && (

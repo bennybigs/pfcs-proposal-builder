@@ -61,9 +61,47 @@ export type LeadStatus =
   | 'disqualified'
   | 'none';
 
+/**
+ * A contact has a TYPE (what this person or company is to us), never a
+ * pipeline status — status belongs to the deal. Editable set; these are the
+ * starting values for the construction directory.
+ */
+export const CONTACT_TYPES = [
+  'customer',
+  'subcontractor',
+  'supplier',
+  'general_contractor',
+  'engineer_architect',
+  'building_dept',
+  'lender',
+  'equipment_rental',
+  'realtor_land',
+  'insurance',
+  'township_zoning',
+  'other',
+] as const;
+export type ContactType = (typeof CONTACT_TYPES)[number];
+
+export const CONTACT_TYPE_LABEL: Record<string, string> = {
+  customer: 'Customer',
+  subcontractor: 'Subcontractor',
+  supplier: 'Supplier / Vendor',
+  general_contractor: 'General Contractor',
+  engineer_architect: 'Engineer / Architect',
+  building_dept: 'Building Dept / Inspector',
+  lender: 'Lender',
+  equipment_rental: 'Equipment Rental',
+  realtor_land: 'Realtor / Land',
+  insurance: 'Insurance',
+  township_zoning: 'Township / Zoning',
+  other: 'Other',
+};
+
 export interface Contact {
   id: string;
   name: string;
+  /** what they are to us — Customer, Subcontractor, Supplier… */
+  type: string;
   email: string;
   phone: string;
   address: string;
