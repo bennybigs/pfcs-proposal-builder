@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -75,6 +77,8 @@ export function TopBar({
   crmControl?: React.ReactNode;
 }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
+  const archiveProposal = useProposalStore((s) => s.archiveProposal);
+  const restoreProposal = useProposalStore((s) => s.restoreProposal);
   const logoUrl = useLibraryStore((s) => s.settings.logoUrl);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const navigate = useNavigate();
@@ -181,7 +185,7 @@ export function TopBar({
           {/* phones: one labeled menu instead of a row of mystery icons */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="lg:hidden" aria-label="More actions">
+              <Button variant="outline" size="sm" aria-label="More actions">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -194,20 +198,20 @@ export function TopBar({
               <DropdownMenuItem onClick={onExportCustomerCsv}><Users /> QuickBooks Customer CSV</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportJson}><FileJson /> Proposal JSON (backup)</DropdownMenuItem>
               <DropdownMenuSeparator />
+              {proposal.archivedAt ? (
+                <DropdownMenuItem onClick={() => restoreProposal(proposal.id)}>
+                  <ArchiveRestore /> Restore from archive
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => archiveProposal(proposal.id)}>
+                  <Archive /> Archive proposal
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(true)}>
                 <Trash2 /> Delete proposal
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden h-8 w-8 text-brand-steel hover:text-red-600 lg:inline-flex"
-            onClick={() => setConfirmDelete(true)}
-            aria-label="Delete proposal"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 

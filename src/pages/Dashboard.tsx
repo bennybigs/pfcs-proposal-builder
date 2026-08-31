@@ -75,14 +75,15 @@ export default function Dashboard() {
             key={p.id}
             className={
               'group relative rounded-lg border-l-4 bg-white p-4 shadow-sm transition-shadow hover:shadow-md ' +
-              (isContract ? 'border-brand-black' : 'border-brand-orange')
+              (isContract ? 'border-brand-black' : 'border-brand-orange') +
+              (p.archivedAt ? ' opacity-70' : '')
             }
           >
             <Link to={`/proposal/${p.id}`} className="block">
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2 pr-8">
                 <div className="text-xs font-semibold text-brand-steel">{p.proposalNumber}</div>
                 <Badge className={status.className} variant="secondary">
-                  {status.label}
+                  {p.archivedAt ? 'Archived' : status.label}
                 </Badge>
               </div>
               <div className="mt-1 font-heading text-lg font-bold uppercase tracking-wide">
@@ -96,7 +97,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </Link>
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute right-2 top-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7">

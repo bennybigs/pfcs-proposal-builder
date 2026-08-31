@@ -4,6 +4,7 @@
 // DECISION: on mobile the columns scroll horizontally with scroll-snap
 // (chosen over stage tabs — you can still see neighboring stages).
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
   DndContext,
@@ -34,6 +35,7 @@ import {
   LogButton,
   LostDialog,
   ArchiveDealDialog,
+  restoreDeal,
   ReminderDialog,
   StageChipControl,
 } from '@/components/crm/CardActions';
@@ -80,12 +82,20 @@ export default function Pipeline() {
   // '' = everyone, '__unassigned__' = nobody, else a member email
   const [assignee, setAssignee] = useState('');
   const [attentionOnly, setAttentionOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const contactById = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
   // archived cards/contacts take their deals off the board and out of the numbers
+  const archivedDeals = useMemo(() => deals.filter((d) => d.archived_at), [deals]);
+  // the board shows live cards; the Archived view shows the put-away ones
   const activeDeals = useMemo(
-    () => deals.filter((d) => !d.archived_at && !contactById.get(d.contact_id)?.archived),
-    [deals, contactById]
+    () =>
+      deals.filter((d) =>
+        showArchived
+          ? !!d.archived_at
+          : !d.archived_at && !contactById.get(d.contact_id)?.archived
+      ),
+    [deals, contactById, showArchived]
   );
   const quiet = useMemo(() => goneQuietDealIds(activeDeals, activities, tasks), [activeDeals, activities, tasks]);
 
@@ -187,7 +197,20 @@ export default function Pipeline() {
     <div>
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold text-brand-black">Pipeline</h1>
-        {attentionCount > 0 && (
+        {archivedDeals.length > 0 && (
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={cn(
+              'rounded-full border px-2.5 py-1 text-xs font-semibold',
+              showArchived
+                ? 'border-brand-steel bg-brand-gray-light text-brand-black'
+                : 'border-gray-200 bg-white text-brand-steel hover:bg-brand-gray-bg'
+            )}
+          >
+            Archived ({archivedDeals.length})
+          </button>
+        )}
+        {!showArchived && attentionCount > 0 && (
           <button
             onClick={() => setAttentionOnly(!attentionOnly)}
             className={cn(
@@ -405,6 +428,7 @@ function DealCard({
   const [taskOpen, setTaskOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const qc = useQueryClient();
   const level = aging?.level ?? 'ok';
   return (
     <div
@@ -499,7 +523,24 @@ function DealCard({
                 Mark lost…
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
+            {deal.archived_at ? (
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (!contact) return;
+                  try {
+                    await restoreDeal(deal, contact);
+                    qc.invalidateQueries({ queryKey: ['deals'] });
+                    toast.success('Restored to the board');
+                  } catch (err) {
+                    toast.error('Could not restore', err instanceof Error ? err.message : String(err));
+                  }
+                }}
+              >
+                Restore from archive
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
