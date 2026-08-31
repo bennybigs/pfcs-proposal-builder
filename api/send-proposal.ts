@@ -15,6 +15,16 @@ const SVC = () => process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CANONICAL_ORIGIN = 'https://pfcs-proposal-builder.vercel.app';
 
 const clean = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+/**
+ * Build a From header safely. A display name containing a comma, quote, or
+ * angle bracket MUST be quoted — "Post-Frame Construction Solutions, LLC"
+ * unquoted parses as two addresses and the send is rejected.
+ */
+const fromHeader = (displayName: string, email: string): string => {
+  const name = displayName.replace(/[\\"<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  return name ? `"${name}" <${email}>` : email;
+};
 const cleanMultiline = (v: unknown, max: number) =>
   String(v ?? '').replace(/\r\n/g, '\n').trim().slice(0, max);
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -124,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'X-Postmark-Server-Token': token,
       },
       body: JSON.stringify({
-        From: `${fromDisplay} <${from}>`,
+        From: fromHeader(fromDisplay, from),
         To: to,
         ...(isEmail(replyTo) && !sendAsPm ? { ReplyTo: replyTo } : {}),
         Subject: subject,

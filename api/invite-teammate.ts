@@ -101,7 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'X-Postmark-Server-Token': token,
       },
       body: JSON.stringify({
-        From: `Post-Frame Construction Solutions <${from}>`,
+        // display name quoted — a comma or quote in it breaks From parsing
+        From: `"Post-Frame Construction Solutions" <${from}>`,
         To: toEmail,
         ReplyTo: admin.email,
         Subject: `${admin.name} added you to the PFCS CRM`,
