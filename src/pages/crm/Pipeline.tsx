@@ -33,6 +33,7 @@ import {
   HoldDialog,
   LogButton,
   LostDialog,
+  ArchiveDealDialog,
   ReminderDialog,
   StageChipControl,
 } from '@/components/crm/CardActions';
@@ -403,6 +404,7 @@ function DealCard({
   const [lostOpen, setLostOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const level = aging?.level ?? 'ok';
   return (
     <div
@@ -497,6 +499,7 @@ function DealCard({
                 Mark lost…
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -511,6 +514,7 @@ function DealCard({
           <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
           <AddTaskDialog deal={deal} contact={contact} open={taskOpen} onOpenChange={setTaskOpen} />
           <ReminderDialog deal={deal} contact={contact} open={remindOpen} onOpenChange={setRemindOpen} />
+          <ArchiveDealDialog deal={deal} contact={contact} open={archiveOpen} onOpenChange={setArchiveOpen} />
         </>
       )}
     </div>

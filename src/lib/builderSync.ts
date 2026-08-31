@@ -124,14 +124,9 @@ export function useBuilderCloudSync(): void {
           }
         }
       }
-      // deletions: ids the server knows that no longer exist locally
-      for (const id of [...lastPushed.keys()]) {
-        if (!local[id]) {
-          const { error } = await sb.from('proposals').delete().eq('id', id);
-          if (error) throw error;
-          lastPushed.delete(id);
-        }
-      }
+      // NOTE: no row deletion here on purpose. Deleting a proposal writes a
+      // tombstone (deletedAt) that travels as a normal edit — hard-deleting
+      // the row let a device holding a stale copy push it straight back.
       // shared library + settings (one LWW document)
       const lib = useLibraryStore.getState();
       const libDoc = JSON.stringify({ templates: lib.templates, settings: lib.settings });

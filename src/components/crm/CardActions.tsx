@@ -846,3 +846,82 @@ export function ReminderDialog({
     </Dialog>
   );
 }
+
+/** Archive keeps the record and its whole history — just off the board. */
+export function ArchiveDealDialog({
+  deal,
+  contact,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  deal: Deal;
+  contact: Contact;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onDone?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) setReason('');
+  }, [open]);
+
+  const save = async () => {
+    if (!reason.trim()) return;
+    setBusy(true);
+    try {
+      await updateDeal(deal.id, {
+        archived_at: new Date().toISOString(),
+        archive_reason: reason.trim(),
+      });
+      await logSystem(contact.id, deal.id, `Archived — ${reason.trim()}`);
+      qc.invalidateQueries({ queryKey: ['deals'] });
+      void refreshLeadBadge();
+      toast.success('Archived', 'Off the board, everything kept — restore any time.');
+      onOpenChange(false);
+      onDone?.();
+    } catch (err) {
+      toast.error('Could not archive', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Archive {deal.title}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-1.5">
+          <Label className="text-xs text-brand-steel">Why (required)</Label>
+          <Input
+            autoFocus
+            value={reason}
+            placeholder="duplicate, test card, never real…"
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && save()}
+          />
+          <p className="text-xs text-brand-steel">
+            The card leaves the board and the lists. Its timeline, proposals, and the contact all
+            stay — you can restore it later.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={busy || !reason.trim()}>Archive</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Bring an archived card back to the board, logged. */
+export async function restoreDeal(deal: Deal, contact: Contact): Promise<void> {
+  await updateDeal(deal.id, { archived_at: null, archive_reason: null });
+  await logSystem(contact.id, deal.id, 'Restored from archive');
+  void refreshLeadBadge();
+}

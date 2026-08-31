@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Copy, FileSignature, FileUp, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Archive, Copy, FileSignature, FileUp, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { Button } from '@/components/ui/button';
@@ -34,15 +34,22 @@ export default function Dashboard() {
   const duplicateProposal = useProposalStore((s) => s.duplicateProposal);
   const importProposal = useProposalStore((s) => s.importProposal);
   const updateProposal = useProposalStore((s) => s.updateProposal);
+  const archiveProposal = useProposalStore((s) => s.archiveProposal);
+  const restoreProposal = useProposalStore((s) => s.restoreProposal);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Proposal | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const all = Object.values(proposals).sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-  const list = all.filter((p) => p.status !== 'contract');
-  const contracts = all.filter((p) => p.status === 'contract');
+  // deleted proposals live on as tombstones so the deletion can sync — they
+  // are never shown anywhere
+  const all = Object.values(proposals)
+    .filter((p) => !p.deletedAt)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const active = all.filter((p) => !p.archivedAt);
+  const list = active.filter((p) => p.status !== 'contract');
+  const contracts = active.filter((p) => p.status === 'contract');
+  const archived = all.filter((p) => p.archivedAt);
 
   const handleImportFile = async (file: File) => {
     try {
@@ -119,6 +126,15 @@ export default function Dashboard() {
                     <Copy /> Duplicate
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {p.archivedAt ? (
+                    <DropdownMenuItem onClick={() => restoreProposal(p.id)}>
+                      <Undo2 /> Restore
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => archiveProposal(p.id)}>
+                      <Archive /> Archive
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     className="text-red-600 focus:text-red-600"
                     onClick={() => setDeleteTarget(p)}
@@ -194,6 +210,20 @@ export default function Dashboard() {
               Contracts
             </h1>
             {renderGrid(contracts)}
+          </>
+        )}
+
+        {archived.length > 0 && (
+          <>
+            <div className="mb-6 mt-12 flex items-center gap-3">
+              <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-brand-steel">
+                Archived
+              </h1>
+              <Button variant="outline" size="sm" onClick={() => setShowArchived(!showArchived)}>
+                {showArchived ? 'Hide' : `Show (${archived.length})`}
+              </Button>
+            </div>
+            {showArchived && renderGrid(archived)}
           </>
         )}
       </main>

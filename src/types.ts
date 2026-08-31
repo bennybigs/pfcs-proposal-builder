@@ -31,6 +31,17 @@ export interface Proposal {
   /** Optional CRM linkage (contact + deal ids in Supabase). Absent on
    *  proposals that never touched the CRM — fully backward-compatible. */
   crm?: { contactId: string; dealId: string };
+
+  /** Archived: out of the working list, everything kept, restorable. */
+  archivedAt?: string;
+  /**
+   * Deleted: a TOMBSTONE, not a missing row. Deletion is an edit that syncs
+   * like any other, so a device holding a stale copy adopts the deletion
+   * instead of re-uploading the proposal. (Hard-deleting the row let stale
+   * devices resurrect it — the bug this replaces.)
+   */
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface CustomerInfo {

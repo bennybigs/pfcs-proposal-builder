@@ -540,6 +540,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             <div className="mt-2 grid gap-2">
               {links.map((pl) => {
                 const local = localProposals[pl.proposal_id];
+                if (local?.deletedAt) return null; // deleted — tombstoned
                 // the live number when this device has the document, else the
                 // last one the server saw
                 const total = local ? Math.round(grandTotal(local)) : pl.total;

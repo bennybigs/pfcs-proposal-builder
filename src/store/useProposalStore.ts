@@ -30,6 +30,8 @@ interface ProposalsState {
   createProposal: (templateId: string | null, customerName: string) => Proposal;
   updateProposal: (id: string, patch: Partial<Proposal>) => void;
   deleteProposal: (id: string) => void;
+  archiveProposal: (id: string) => void;
+  restoreProposal: (id: string) => void;
   duplicateProposal: (id: string) => Proposal | undefined;
   importProposal: (proposal: Proposal) => Proposal;
 
@@ -101,12 +103,21 @@ export const useProposalStore = create<ProposalsState>()(
 
         updateProposal: (id, patch) => mutate(id, (p) => ({ ...p, ...patch })),
 
+        // Deleting writes a tombstone rather than dropping the record: the
+        // deletion then syncs like any other edit and wins by last-write, so
+        // another device's stale copy can never bring it back.
         deleteProposal: (id) =>
-          set((s) => {
-            const next = { ...s.proposals };
-            delete next[id];
-            return { proposals: next };
-          }),
+          mutate(id, (p) => ({
+            ...p,
+            deletedAt: new Date().toISOString(),
+            archivedAt: undefined,
+          })),
+
+        archiveProposal: (id) =>
+          mutate(id, (p) => ({ ...p, archivedAt: new Date().toISOString() })),
+
+        restoreProposal: (id) =>
+          mutate(id, (p) => ({ ...p, archivedAt: undefined, deletedAt: undefined })),
 
         duplicateProposal: (id) => {
           const source = get().proposals[id];
