@@ -126,7 +126,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
   useEffect(() => startLeadBadge(), []);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
+      <div className="mx-auto flex h-16 max-w-[1800px] items-center justify-between gap-2 px-3 sm:h-20 sm:gap-4 sm:px-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-6">
           <Link to="/" className="flex shrink-0 items-center gap-2">
             <img
@@ -171,7 +171,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
       </div>
       {PROPOSAL_ROUTES.includes(pathname) && (
         <div className="border-t bg-white">
-          <nav className="mx-auto flex max-w-6xl items-center gap-1 px-4 py-2">
+          <nav className="mx-auto flex max-w-[1800px] items-center gap-1 px-4 py-2">
             {PROPOSAL_SUBNAV.map((item) => (
               <Link
                 key={item.to}

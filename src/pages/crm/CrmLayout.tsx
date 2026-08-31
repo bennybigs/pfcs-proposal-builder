@@ -56,7 +56,7 @@ function CrmShell() {
     <div className="min-h-screen bg-brand-gray-bg">
       <AppHeader />
       <div className="border-b bg-white">
-        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-2">
+        <nav className="mx-auto flex max-w-[1800px] items-center gap-1 overflow-x-auto px-4 py-2">
           <SessionBadge />
           {nav.map((item) => {
             const active =
@@ -91,7 +91,7 @@ function CrmShell() {
         </nav>
       </div>
       <PushBanner />
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-[1800px] px-4 py-6">
         <Outlet />
       </main>
     </div>

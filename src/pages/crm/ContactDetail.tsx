@@ -474,7 +474,7 @@ function QuickLogBar({ contactId }: { contactId: string }) {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-white p-2 shadow-lg sm:static sm:mt-4 sm:rounded-lg sm:border sm:shadow-sm">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-[1800px]">
         {pendingType && (
           <input
             autoFocus

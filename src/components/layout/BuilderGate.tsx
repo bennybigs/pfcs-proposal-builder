@@ -31,7 +31,7 @@ export function BuilderGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-brand-gray-bg">
       <AppHeader />
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main className="mx-auto max-w-[1800px] px-4 py-10">
         {state === 'out' && (
           <div className="mx-auto max-w-sm rounded-lg border bg-white p-6 text-center shadow-sm">
             <Lock className="mx-auto h-6 w-6 text-brand-steel/60" />

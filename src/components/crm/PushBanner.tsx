@@ -56,7 +56,7 @@ export function PushBanner() {
 
   return (
     <div className="border-b bg-brand-orange/10">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-sm text-brand-black">
+      <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2 px-4 py-2 text-sm text-brand-black">
         {show === 'enable' ? (
           <>
             <BellRing className="h-4 w-4 shrink-0 text-brand-orange" />

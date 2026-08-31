@@ -59,7 +59,7 @@ export default function LibraryEditor() {
         }
       />
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row">
+      <main className="mx-auto flex max-w-[1800px] flex-col gap-6 px-4 py-8 md:flex-row">
         {/* Template list */}
         <aside className="w-full shrink-0 md:w-72">
           <h1 className="mb-4 font-heading text-2xl font-bold uppercase tracking-wide">

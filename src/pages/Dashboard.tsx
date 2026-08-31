@@ -66,7 +66,7 @@ export default function Dashboard() {
   };
 
   const renderGrid = (items: Proposal[]) => (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {items.map((p) => {
         const status = STATUS_META[p.status] ?? STATUS_META.draft;
         const isContract = p.status === 'contract';
@@ -161,7 +161,7 @@ export default function Dashboard() {
         }
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-[1800px] px-4 py-8">
         <input
           ref={fileInputRef}
           type="file"
