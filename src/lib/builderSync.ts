@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { grandTotal } from '@/lib/pricing';
 import type { Proposal } from '@/types';
 
 export type BuilderSyncStatus = 'off' | 'signedOut' | 'syncing' | 'synced' | 'error';
@@ -99,6 +100,29 @@ export function useBuilderCloudSync(): void {
           throw error;
         }
         lastPushed.set(p.id, p.updatedAt ?? '');
+
+        // Keep the CRM's copy of this proposal's number honest, so nobody
+        // ever has to press a "refresh" button: on every edit, the linked
+        // proposal_links row gets the live total, and when that proposal is
+        // the one marked as the deal's value, the deal follows it.
+        const dealId = p.crm?.dealId;
+        if (dealId) {
+          try {
+            const total = Math.round(grandTotal(p));
+            const title = p.project.referenceName || p.customer.fullName || p.proposalNumber;
+            const { data: rows } = await sb
+              .from('proposal_links')
+              .update({ total, title })
+              .eq('deal_id', dealId)
+              .eq('proposal_id', p.id)
+              .select('counts_toward_value');
+            if (rows?.[0]?.counts_toward_value) {
+              await sb.from('deals').update({ value: total }).eq('id', dealId);
+            }
+          } catch {
+            // never let CRM bookkeeping break proposal sync
+          }
+        }
       }
       // deletions: ids the server knows that no longer exist locally
       for (const id of [...lastPushed.keys()]) {

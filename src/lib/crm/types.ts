@@ -159,6 +159,9 @@ export interface ProposalLink {
   title: string;
   total: number;
   share_url: string | null;
+  /** This proposal's total IS the deal's value — kept in sync automatically.
+   *  At most one per deal (setting it clears the others). */
+  counts_toward_value: boolean;
   linked_at: string;
   linked_by: string;
 }

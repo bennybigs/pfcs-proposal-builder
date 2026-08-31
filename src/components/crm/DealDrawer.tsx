@@ -13,6 +13,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
+  Eye,
   FileText,
   Mail,
   MessageSquare,
@@ -20,7 +21,6 @@ import {
   Phone,
   Pin,
   Plus,
-  RefreshCw,
   Trash2,
   Trophy,
   X,
@@ -48,7 +48,7 @@ import { toast } from '@/components/ui/toast';
 import { useDealMutations } from '@/lib/crm/api/deals';
 import { useContactMutations } from '@/lib/crm/api/contacts';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
-import { useDealProposalLinks } from '@/lib/crm/api/proposalLinks';
+import { useDealProposalLinks, setCountsTowardValue } from '@/lib/crm/api/proposalLinks';
 import {
   useContactActivities,
   useLogActivity,
@@ -67,6 +67,9 @@ import {
   WonDialog,
 } from '@/components/crm/CardActions';
 import { useProposalStore } from '@/store/useProposalStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { companySnapshot } from '@/lib/shareLink';
 import { grandTotal } from '@/lib/pricing';
 import { formatPhone, isValidPhone, normalizePhone } from '@/lib/crm/phone';
 import { formatDateUS } from '@/lib/format';
@@ -84,6 +87,7 @@ import {
   type ContactSource,
   type Deal,
   type DealSegment,
+  type ProposalLink,
   type DealStage,
 } from '@/lib/crm/types';
 import { cn } from '@/lib/utils';
@@ -145,6 +149,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const { data: links = [] } = useDealProposalLinks(deal ? [deal.id] : []);
   const { data: activities = [] } = useContactActivities(contact?.id);
   const localProposals = useProposalStore((s) => s.proposals);
+  const settings = useLibraryStore((s) => s.settings);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [original, setOriginal] = useState<Draft | null>(null);
@@ -154,6 +159,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const [wonOpen, setWonOpen] = useState(false);
   const [holdOpen, setHoldOpen] = useState(false);
   const [logForceOpen, setLogForceOpen] = useState(false);
+  const [viewProposalId, setViewProposalId] = useState<string | null>(null);
   const pendingCallAt = useRef<number | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
@@ -274,12 +280,36 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
     }
   };
 
-  const useTotal = async (total: number) => {
-    await updateDeal.mutateAsync({ id: deal.id, patch: { value: Math.round(total) } });
-    if (contact) await logSystem(contact.id, deal.id, `Value: ${formatDollars(deal.value)} → ${formatDollars(total)} (from proposal)`);
-    set({ value: String(Math.round(total)) });
-    setOriginal((o) => (o ? { ...o, value: String(Math.round(total)) } : o));
-    toast.success('Deal value updated');
+  /**
+   * One checkbox replaces the old "use this total" / "refresh" pair: the
+   * chosen proposal's total IS the deal value from now on, and builderSync
+   * keeps it current on every edit. A deal has one value, so checking one
+   * clears the others.
+   */
+  const setDealValueSource = async (pl: ProposalLink, total: number, on: boolean) => {
+    try {
+      await setCountsTowardValue(deal.id, pl.proposal_id, on);
+      if (on && Math.round(deal.value) !== total) {
+        await updateDeal.mutateAsync({ id: deal.id, patch: { value: total } });
+        if (contact) {
+          await logSystem(
+            contact.id,
+            deal.id,
+            `Value: ${formatDollars(deal.value)} → ${formatDollars(total)} (from proposal)`
+          );
+        }
+        set({ value: String(total) });
+        setOriginal((o) => (o ? { ...o, value: String(total) } : o));
+      }
+      qc.invalidateQueries({ queryKey: ['proposal_links'] });
+      qc.invalidateQueries({ queryKey: ['deals'] });
+      toast.success(
+        on ? 'Deal value follows this proposal' : 'Deal value is manual again',
+        on ? 'It updates itself whenever the proposal changes.' : undefined
+      );
+    } catch (err) {
+      toast.error('Could not update', err instanceof Error ? err.message : String(err));
+    }
   };
 
   const open = !['won', 'lost'].includes(deal.stage);
@@ -480,7 +510,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           </Field>
         </div>
 
-        {/* Proposals — unchanged behavior */}
+        {/* Proposals — tap to view, Edit to work on it, one checkbox decides
+            which proposal IS this deal's value (kept in sync automatically) */}
         <div className="mt-5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-brand-black">Proposals</h3>
@@ -488,21 +519,50 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           </div>
           {links.length === 0 ? (
             <p className="mt-1 text-xs text-brand-steel">
-              None linked yet — start one from the contact page, or use “Link to CRM” inside a
-              proposal.
+              None yet — “New proposal” starts one attached to this deal.
             </p>
           ) : (
             <div className="mt-2 grid gap-2">
               {links.map((pl) => {
                 const local = localProposals[pl.proposal_id];
+                // the live number when this device has the document, else the
+                // last one the server saw
+                const total = local ? Math.round(grandTotal(local)) : pl.total;
                 return (
                   <div key={pl.id} className="rounded-md border p-2 text-sm">
-                    <div className="flex items-center gap-2">
+                    <button
+                      className="flex w-full items-center gap-2 text-left hover:opacity-80"
+                      onClick={() => local && setViewProposalId(pl.proposal_id)}
+                      disabled={!local}
+                      title={local ? 'View the proposal' : 'Not available on this device yet'}
+                    >
                       <FileText className="h-3.5 w-3.5 shrink-0 text-brand-steel" />
                       <span className="min-w-0 flex-1 truncate font-medium">{pl.title || 'Proposal'}</span>
-                      <span className="text-brand-steel">{formatDollars(pl.total)}</span>
-                    </div>
+                      <span className="font-semibold text-brand-black">{formatDollars(total)}</span>
+                    </button>
+                    <label className="mt-1.5 flex items-center gap-2 text-xs text-brand-black">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-orange"
+                        checked={pl.counts_toward_value}
+                        onChange={(e) => void setDealValueSource(pl, total, e.target.checked)}
+                      />
+                      Counts as the deal value
+                      {pl.counts_toward_value && (
+                        <span className="text-brand-steel">— updates itself when you edit</span>
+                      )}
+                    </label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {local && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => setViewProposalId(pl.proposal_id)}
+                        >
+                          <Eye className="mr-1 h-3 w-3" /> View
+                        </Button>
+                      )}
                       {local && (
                         <Button
                           size="sm"
@@ -513,22 +573,14 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                             })
                           }
                         >
-                          <Pencil className="mr-1 h-3 w-3" /> Edit proposal
+                          <Pencil className="mr-1 h-3 w-3" /> Edit
                         </Button>
                       )}
                       {pl.share_url && (
                         <Button asChild size="sm" variant="outline" className="h-7 text-xs">
                           <a href={pl.share_url} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-1 h-3 w-3" /> Open
+                            <ExternalLink className="mr-1 h-3 w-3" /> Customer link
                           </a>
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => useTotal(pl.total)}>
-                        Use this total
-                      </Button>
-                      {local && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => useTotal(grandTotal(local))}>
-                          <RefreshCw className="mr-1 h-3 w-3" /> Refresh from proposal
                         </Button>
                       )}
                     </div>
@@ -616,6 +668,32 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           </>
         )}
         <WonDialog deal={deal} open={wonOpen} onOpenChange={setWonOpen} />
+
+        {/* view the proposal exactly as the customer sees it */}
+        <Dialog open={!!viewProposalId} onOpenChange={(o) => !o && setViewProposalId(null)}>
+          <DialogContent className="light-scope max-h-[90vh] max-w-4xl overflow-y-auto bg-brand-gray-bg p-3 sm:p-6">
+            <DialogTitle className="sr-only">Proposal preview</DialogTitle>
+            {viewProposalId && localProposals[viewProposalId] && (
+              <>
+                <CustomerProposal
+                  proposal={localProposals[viewProposalId]}
+                  company={companySnapshot(settings)}
+                />
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    onClick={() =>
+                      navigate(`/proposal/${viewProposalId}`, {
+                        state: { from: location.pathname + location.search },
+                      })
+                    }
+                  >
+                    <Pencil className="mr-1.5 h-4 w-4" /> Edit this proposal
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

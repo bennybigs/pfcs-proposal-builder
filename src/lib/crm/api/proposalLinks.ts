@@ -33,6 +33,30 @@ export async function listLinksForDeals(dealIds: string[]): Promise<ProposalLink
   return data as ProposalLink[];
 }
 
+/**
+ * Mark which proposal drives the deal's value. A deal has one value, so at
+ * most one proposal can claim it — setting one clears the rest. Returns the
+ * total that should now be on the deal (caller writes it + logs).
+ */
+export async function setCountsTowardValue(
+  dealId: string,
+  proposalId: string,
+  on: boolean
+): Promise<void> {
+  const { error: clearErr } = await sb()
+    .from('proposal_links')
+    .update({ counts_toward_value: false })
+    .eq('deal_id', dealId);
+  if (clearErr) throw clearErr;
+  if (!on) return;
+  const { error } = await sb()
+    .from('proposal_links')
+    .update({ counts_toward_value: true })
+    .eq('deal_id', dealId)
+    .eq('proposal_id', proposalId);
+  if (error) throw error;
+}
+
 export async function unlinkProposal(dealId: string, proposalId: string): Promise<void> {
   const { error } = await sb()
     .from('proposal_links')
