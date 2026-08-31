@@ -11,7 +11,7 @@
 //   HoldDialog, LostDialog, WonDialog — shared everywhere
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ClipboardList } from 'lucide-react';
+import { ChevronDown, ClipboardList, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/components/ui/toast';
-import { useDealMutations, updateDeal } from '@/lib/crm/api/deals';
+import { useDealMutations, updateDeal, deleteDeal } from '@/lib/crm/api/deals';
 import { useContactMutations } from '@/lib/crm/api/contacts';
 import { useLogActivity, logSystem } from '@/lib/crm/api/activities';
 import { useTaskMutations } from '@/lib/crm/api/tasks';
@@ -924,4 +924,201 @@ export async function restoreDeal(deal: Deal, contact: Contact): Promise<void> {
   await updateDeal(deal.id, { archived_at: null, archive_reason: null });
   await logSystem(contact.id, deal.id, 'Restored from archive');
   void refreshLeadBadge();
+}
+
+/**
+ * The ⋯ menu — identical on the board card face and inside the opened
+ * drawer, so the same actions are one tap away wherever you are.
+ * Delete is admin-only and demands the card's name typed out.
+ */
+export function CardOverflowMenu({
+  deal,
+  contact,
+  iAmAdmin,
+  onOpenCard,
+  onDeleted,
+  className,
+}: {
+  deal: Deal;
+  contact: Contact | undefined;
+  iAmAdmin: boolean;
+  /** omitted inside the drawer — you're already in the card */
+  onOpenCard?: () => void;
+  onDeleted?: () => void;
+  className?: string;
+}) {
+  const qc = useQueryClient();
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const [holdOpen, setHoldOpen] = useState(false);
+  const [lostOpen, setLostOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const open = !['won', 'lost'].includes(deal.stage);
+  const held = !!deal.held_until && deal.held_until > todayIso();
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            onClick={(e) => e.stopPropagation()}
+            title="More actions"
+            className={cn(
+              'rounded-md border p-1.5 text-brand-steel hover:bg-brand-gray-bg',
+              className
+            )}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          {onOpenCard && <DropdownMenuItem onClick={onOpenCard}>Edit / open card</DropdownMenuItem>}
+          <DropdownMenuItem onClick={() => setTaskOpen(true)}>Add task…</DropdownMenuItem>
+          {open && <DropdownMenuItem onClick={() => setRemindOpen(true)}>Set reminder…</DropdownMenuItem>}
+          {open &&
+            (held ? (
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (!contact) return;
+                  try {
+                    await releaseHold(deal, contact);
+                    qc.invalidateQueries({ queryKey: ['deals'] });
+                    toast.success('Hold released');
+                  } catch (err) {
+                    toast.error('Could not release', err instanceof Error ? err.message : String(err));
+                  }
+                }}
+              >
+                Release hold
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => setHoldOpen(true)}>On hold…</DropdownMenuItem>
+            ))}
+          {open && (
+            <DropdownMenuItem className="text-red-600" onClick={() => setLostOpen(true)}>
+              Mark lost…
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          {deal.archived_at ? (
+            <DropdownMenuItem
+              onClick={async () => {
+                if (!contact) return;
+                try {
+                  await restoreDeal(deal, contact);
+                  qc.invalidateQueries({ queryKey: ['deals'] });
+                  toast.success('Restored to the board');
+                } catch (err) {
+                  toast.error('Could not restore', err instanceof Error ? err.message : String(err));
+                }
+              }}
+            >
+              Restore from archive
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
+          )}
+          {/* permanent — admins only, per Ben's rule */}
+          {iAmAdmin && (
+            <DropdownMenuItem className="text-red-600" onClick={() => setDeleteOpen(true)}>
+              Delete forever…
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {contact && (
+        <>
+          <AddTaskDialog deal={deal} contact={contact} open={taskOpen} onOpenChange={setTaskOpen} />
+          <ReminderDialog deal={deal} contact={contact} open={remindOpen} onOpenChange={setRemindOpen} />
+          <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
+          <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
+          <ArchiveDealDialog
+            deal={deal}
+            contact={contact}
+            open={archiveOpen}
+            onOpenChange={setArchiveOpen}
+            onDone={onDeleted}
+          />
+          <DeleteDealDialog
+            deal={deal}
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            onDeleted={onDeleted}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** Permanent delete — type the card name to confirm. Archive is the norm. */
+function DeleteDealDialog({
+  deal,
+  open,
+  onOpenChange,
+  onDeleted,
+}: {
+  deal: Deal;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onDeleted?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) setTyped('');
+  }, [open]);
+
+  const go = async () => {
+    setBusy(true);
+    try {
+      await deleteDeal(deal.id);
+      qc.invalidateQueries({ queryKey: ['deals'] });
+      qc.invalidateQueries({ queryKey: ['activities'] });
+      void refreshLeadBadge();
+      toast.success('Deleted', 'The contact and their proposals are untouched.');
+      onOpenChange(false);
+      onDeleted?.();
+    } catch (err) {
+      toast.error('Could not delete', err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Delete this card forever?</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <p className="text-sm text-brand-steel">
+            Permanently removes <b>{deal.title}</b> and its timeline, tasks, and proposal links —
+            for everyone. The contact and the proposal documents themselves are not deleted.
+            <br />
+            <span className="text-brand-black">Archive is usually what you want instead.</span>
+          </p>
+          <Label className="text-xs text-brand-steel">
+            Type the card name to confirm: <b>{deal.title}</b>
+          </Label>
+          <Input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            variant="outline"
+            className="text-red-600 hover:bg-red-50"
+            disabled={busy || typed.trim() !== deal.title.trim()}
+            onClick={go}
+          >
+            Delete forever
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

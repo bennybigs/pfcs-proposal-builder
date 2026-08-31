@@ -60,6 +60,7 @@ import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/lib/crm/session';
 import {
   AssigneePicker,
+  CardOverflowMenu,
   HoldDialog,
   LogButton,
   LostDialog,
@@ -322,7 +323,17 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
     <Sheet open={!!deal} onOpenChange={(o) => !o && requestClose()}>
       <SheetContent className="w-full overflow-y-auto pb-24 sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="pr-8">{draft.title || deal.title}</SheetTitle>
+          <div className="flex items-start gap-2 pr-8">
+            <SheetTitle className="min-w-0 flex-1">{draft.title || deal.title}</SheetTitle>
+            {/* same actions as the card face — one shared component */}
+            <CardOverflowMenu
+              deal={deal}
+              contact={contact}
+              iAmAdmin={iAmAdmin}
+              onDeleted={onClose}
+              className="shrink-0"
+            />
+          </div>
         </SheetHeader>
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">

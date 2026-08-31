@@ -29,14 +29,9 @@ import {
 import { toast } from '@/components/ui/toast';
 import { DealDrawer } from '@/components/crm/DealDrawer';
 import {
-  AddTaskDialog,
   AssigneePicker,
-  HoldDialog,
+  CardOverflowMenu,
   LogButton,
-  LostDialog,
-  ArchiveDealDialog,
-  restoreDeal,
-  ReminderDialog,
   StageChipControl,
 } from '@/components/crm/CardActions';
 import { agingFor, agingWeight, hoursLabel, useCrmSettings, DEFAULT_CRM_SETTINGS, type Aging } from '@/lib/crm/aging';
@@ -423,12 +418,6 @@ function DealCard({
   const held = !!deal.held_until && deal.held_until > new Date().toISOString().slice(0, 10);
   const phoneOk = contact ? isValidPhone(contact.phone) : false;
   const open = !['won', 'lost'].includes(deal.stage);
-  const [holdOpen, setHoldOpen] = useState(false);
-  const [lostOpen, setLostOpen] = useState(false);
-  const [taskOpen, setTaskOpen] = useState(false);
-  const [remindOpen, setRemindOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const qc = useQueryClient();
   const level = aging?.level ?? 'ok';
   return (
     <div
@@ -503,60 +492,17 @@ function DealCard({
           </a>
         )}
         {contact && <LogButton deal={deal} contact={contact} label="" size="sm" className="h-7 px-2" />}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-md border p-1.5 text-brand-steel hover:bg-brand-gray-bg"
-              title="More"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onClick={onOpen}>Edit / open card</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTaskOpen(true)}>Add task…</DropdownMenuItem>
-            {open && <DropdownMenuItem onClick={() => setRemindOpen(true)}>Set reminder…</DropdownMenuItem>}
-            {open && <DropdownMenuItem onClick={() => setHoldOpen(true)}>On hold…</DropdownMenuItem>}
-            {open && (
-              <DropdownMenuItem className="text-red-600" onClick={() => setLostOpen(true)}>
-                Mark lost…
-              </DropdownMenuItem>
-            )}
-            {deal.archived_at ? (
-              <DropdownMenuItem
-                onClick={async () => {
-                  if (!contact) return;
-                  try {
-                    await restoreDeal(deal, contact);
-                    qc.invalidateQueries({ queryKey: ['deals'] });
-                    toast.success('Restored to the board');
-                  } catch (err) {
-                    toast.error('Could not restore', err instanceof Error ? err.message : String(err));
-                  }
-                }}
-              >
-                Restore from archive
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <CardOverflowMenu
+          deal={deal}
+          contact={contact}
+          iAmAdmin={iAmAdmin}
+          onOpenCard={onOpen}
+        />
       </div>
       {iAmAdmin && (
         <div className="mt-1.5">
           <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} className="h-7 w-full" />
         </div>
-      )}
-      {contact && (
-        <>
-          <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
-          <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />
-          <AddTaskDialog deal={deal} contact={contact} open={taskOpen} onOpenChange={setTaskOpen} />
-          <ReminderDialog deal={deal} contact={contact} open={remindOpen} onOpenChange={setRemindOpen} />
-          <ArchiveDealDialog deal={deal} contact={contact} open={archiveOpen} onOpenChange={setArchiveOpen} />
-        </>
       )}
     </div>
   );

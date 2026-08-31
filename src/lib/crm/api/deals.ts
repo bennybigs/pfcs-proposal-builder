@@ -48,6 +48,16 @@ export async function createDeal(input: DealInput): Promise<Deal> {
   return data as Deal;
 }
 
+/**
+ * Permanent. Takes the card's activities, tasks and proposal links with it
+ * (FK cascade) — the CONTACT and the proposal documents survive. Admin-only
+ * in the UI; RLS allows it for admins and a rep's own cards.
+ */
+export async function deleteDeal(id: string): Promise<void> {
+  const { error } = await sb().from('deals').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function updateDeal(id: string, patch: Partial<DealInput>): Promise<void> {
   const { error } = await sb().from('deals').update(patch).eq('id', id);
   if (error) throw error;
