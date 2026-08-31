@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Archive, Copy, FileSignature, FileUp, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Archive, Copy, FileSignature, FileUp, Link2 as LinkIcon, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,12 @@ export default function Dashboard() {
                 {p.project.referenceName || 'Untitled Project'}
               </div>
               <div className="text-sm text-brand-steel">{p.customer.fullName}</div>
+              {!p.crm && (
+                <div className="mt-2 flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                  <LinkIcon className="h-3 w-3" /> Not linked to a customer — open it and use
+                  “Link to CRM”
+                </div>
+              )}
               <div className="mt-3 flex items-baseline justify-between">
                 <span className="text-xs text-brand-steel">Updated {formatDateUS(p.updatedAt)}</span>
                 <span className="font-heading text-lg font-bold text-brand-orange">

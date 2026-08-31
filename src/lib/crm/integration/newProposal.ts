@@ -7,9 +7,13 @@ import { supabase } from '@/lib/supabase';
 import { contactToCustomerInfo } from './mapping';
 import type { Contact, Deal } from '@/lib/crm/types';
 
-export async function createProposalForContact(contact: Contact, deal: Deal): Promise<string> {
+export async function createProposalForContact(
+  contact: Contact,
+  deal: Deal,
+  templateId: string | null = null
+): Promise<string> {
   const store = useProposalStore.getState();
-  const proposal = store.createProposal(null, contact.name);
+  const proposal = store.createProposal(templateId, contact.name);
   store.updateProposal(proposal.id, {
     customer: contactToCustomerInfo(contact),
     project: { ...proposal.project, referenceName: deal.title },

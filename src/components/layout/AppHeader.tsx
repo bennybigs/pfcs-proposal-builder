@@ -105,8 +105,8 @@ function ProfileButton() {
 
 // Two products at the top; each area carries its own sub-navigation.
 const NAV = [
-  { to: '/', label: 'Proposals' },
   { to: '/crm', label: 'CRM' },
+  { to: '/', label: 'Proposals' },
 ];
 
 const PROPOSAL_ROUTES = ['/', '/library', '/settings'];
