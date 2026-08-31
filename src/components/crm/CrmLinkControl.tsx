@@ -18,6 +18,7 @@ import { toast } from '@/components/ui/toast';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { useProposalStore } from '@/store/useProposalStore';
 import { customerInfoToContact } from '@/lib/crm/integration/mapping';
+import { findDuplicateContact, duplicateReason, type DuplicateMatch } from '@/lib/crm/dedupe';
 import { promoteLeadOnDeal } from '@/lib/crm/api/contacts';
 import { grandTotal } from '@/lib/pricing';
 import { STAGE_META, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
@@ -90,6 +91,7 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
   const [results, setResults] = useState<Contact[]>([]);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [picked, setPicked] = useState<Contact | null>(null);
+  const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -148,10 +150,24 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
     }
   };
 
-  const createContactFromProposal = async () => {
+  const createContactFromProposal = async (force = false) => {
     setBusy(true);
     try {
       const base = customerInfoToContact(proposal.customer);
+      // same duplicate rule as everywhere else — check before inserting
+      if (!force) {
+        const { data: pool } = await supabase!.from('contacts').select('*').eq('archived', false);
+        const match = findDuplicateContact((pool ?? []) as Contact[], {
+          name: base.name,
+          email: base.email,
+          phone: base.phone,
+        });
+        if (match) {
+          setBusy(false);
+          setDuplicate(match);
+          return;
+        }
+      }
       const user = (await supabase!.auth.getUser()).data.user;
       const { data, error } = await supabase!
         .from('contacts')
@@ -230,7 +246,22 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
               ))}
               {!results.length && <p className="py-2 text-sm text-brand-steel">No matches.</p>}
             </div>
-            <Button variant="outline" onClick={createContactFromProposal} disabled={busy}>
+            {duplicate && (
+          <div className="mb-2 grid gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="font-medium">
+              {duplicate.contact.name} is already a contact ({duplicateReason(duplicate)}).
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => { const c = duplicate.contact; setDuplicate(null); setPicked(c); }}>
+                Use {duplicate.contact.name}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setDuplicate(null); void createContactFromProposal(true); }}>
+                Create separate contact
+              </Button>
+            </div>
+          </div>
+        )}
+        <Button variant="outline" onClick={() => void createContactFromProposal()} disabled={busy}>
               <UserPlus className="mr-1.5 h-4 w-4" />
               Create contact from this proposal ({proposal.customer.fullName || 'unnamed'})
             </Button>

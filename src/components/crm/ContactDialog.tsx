@@ -22,6 +22,7 @@ import {
 import { toast } from '@/components/ui/toast';
 import { useContactMutations, useContacts } from '@/lib/crm/api/contacts';
 import { normalizePhone } from '@/lib/crm/phone';
+import { findDuplicateContact, duplicateReason, type DuplicateMatch } from '@/lib/crm/dedupe';
 import { refreshLeadBadge } from '@/lib/crm/leadBadge';
 import {
   CONTACT_TYPES,
@@ -57,10 +58,13 @@ const cleanDetail = (v: string) => v.replace(/\s+/g, ' ').trim();
 
 export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props) {
   const { create, update } = useContactMutations();
+  const { data: contacts = [] } = useContacts();
   const [form, setForm] = useState(empty);
+  const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setDuplicate(null);
     setForm(
       contact
         ? {
@@ -93,11 +97,23 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
     type: form.type,
   });
 
-  const save = async () => {
+  const save = async (force = false) => {
     // phones store E.164 — same rule as the drawer and lead form
     if (form.phone.trim() && normalizePhone(form.phone) === null) {
       toast.error('Bad phone number', 'Use a 10-digit US number, e.g. (330) 555-0141.');
       return;
+    }
+    // never quietly make a second record for the same person
+    if (!contact && !force) {
+      const match = findDuplicateContact(contacts, {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+      });
+      if (match) {
+        setDuplicate(match);
+        return;
+      }
     }
     try {
       if (contact) {
@@ -121,6 +137,36 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
         <DialogHeader>
           <DialogTitle>{contact ? 'Edit contact' : 'New contact'}</DialogTitle>
         </DialogHeader>
+        {duplicate && (
+          <div className="grid gap-2 rounded-md border border-amber-300 bg-amber-50 p-3">
+            <div className="text-sm font-medium text-amber-800">
+              {duplicate.contact.name} is already a contact ({duplicateReason(duplicate)}).
+            </div>
+            <div className="text-xs text-amber-800">
+              {[duplicate.contact.phone, duplicate.contact.email].filter(Boolean).join(' · ')}
+              {!duplicate.strong && ' — same name only; a different person is possible.'}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  const existing = duplicate.contact;
+                  setDuplicate(null);
+                  onOpenChange(false);
+                  onCreated?.(existing);
+                }}
+              >
+                Open {duplicate.contact.name}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setDuplicate(null); void save(true); }}>
+                Add as a separate contact
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setDuplicate(null)}>
+                Keep editing
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="grid gap-3">
           <Field label="Name *">
             <Input value={form.name} onChange={(e) => set({ name: e.target.value })} autoFocus />
@@ -192,7 +238,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={!form.name.trim() || create.isPending || update.isPending}>
+          <Button onClick={() => void save()} disabled={!form.name.trim() || create.isPending || update.isPending}>
             {contact ? 'Save changes' : 'Add contact'}
           </Button>
         </DialogFooter>

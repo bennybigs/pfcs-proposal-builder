@@ -26,6 +26,7 @@ import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { createDeal, listDealsForContact } from '@/lib/crm/api/deals';
 import { createProposalForContact } from '@/lib/crm/integration/newProposal';
 import { normalizePhone, formatPhone } from '@/lib/crm/phone';
+import { findDuplicateContact, duplicateReason, type DuplicateMatch } from '@/lib/crm/dedupe';
 import { STAGE_META, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
 
 const BLANK_OPTION = {
@@ -55,6 +56,7 @@ export function TemplatePickerDialog({
   const [dealChoices, setDealChoices] = useState<Deal[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>('barndominium');
   const [busy, setBusy] = useState(false);
+  const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -63,6 +65,7 @@ export function TemplatePickerDialog({
     setPicked(null);
     setCreating(false);
     setForm({ name: '', phone: '', email: '' });
+    setDuplicate(null);
     setSelectedTemplate('barndominium');
     if (CRM_ENABLED && supabase) {
       void supabase
@@ -94,8 +97,12 @@ export function TemplatePickerDialog({
     BLANK_OPTION,
   ];
 
-  /** Create the contact the user typed, then continue to the template step. */
-  const createContact = async () => {
+  /**
+   * Create the contact the user typed — unless they already exist. Same
+   * duplicate rule as every other create path; a match offers the existing
+   * record instead of quietly making a second one.
+   */
+  const createContact = async (force = false) => {
     if (!supabase) return;
     const phoneNorm = form.phone.trim() ? normalizePhone(form.phone) : '';
     if (phoneNorm === null) {
@@ -105,6 +112,17 @@ export function TemplatePickerDialog({
     if (!form.name.trim() || (!phoneNorm && !form.email.trim())) {
       toast.error('Name plus a phone or email is required');
       return;
+    }
+    if (!force) {
+      const match = findDuplicateContact(contacts, {
+        name: form.name,
+        email: form.email,
+        phone: phoneNorm || form.phone,
+      });
+      if (match) {
+        setDuplicate(match);
+        return;
+      }
     }
     setBusy(true);
     try {
@@ -236,6 +254,49 @@ export function TemplatePickerDialog({
                   <UserPlus className="mr-1.5 h-4 w-4" /> New customer
                 </Button>
               </>
+            ) : duplicate ? (
+              <div className="grid gap-3">
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  <div className="font-medium">
+                    {duplicate.contact.name} is already a contact ({duplicateReason(duplicate)}).
+                  </div>
+                  <div className="mt-0.5 text-xs">
+                    {[
+                      duplicate.contact.phone ? formatPhone(duplicate.contact.phone) : '',
+                      duplicate.contact.email,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                  {!duplicate.strong && (
+                    <div className="mt-1 text-xs">
+                      Same name only — if this is a different person, creating a second record is
+                      fine.
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={() => {
+                    const existing = duplicate.contact;
+                    setDuplicate(null);
+                    void choose(existing);
+                  }}
+                >
+                  Use {duplicate.contact.name}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDuplicate(null);
+                    void createContact(true);
+                  }}
+                >
+                  Create a separate contact anyway
+                </Button>
+                <Button variant="outline" onClick={() => setDuplicate(null)}>
+                  Back
+                </Button>
+              </div>
             ) : (
               <>
                 <div className="grid gap-1.5">
@@ -273,7 +334,7 @@ export function TemplatePickerDialog({
                   <Button variant="outline" onClick={() => setCreating(false)}>
                     <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to search
                   </Button>
-                  <Button onClick={createContact} disabled={busy || !form.name.trim()}>
+                  <Button onClick={() => void createContact()} disabled={busy || !form.name.trim()}>
                     Continue
                   </Button>
                 </div>
