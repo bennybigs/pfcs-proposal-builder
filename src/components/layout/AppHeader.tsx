@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Briefcase, Cloud, CloudOff, LogOut, Settings, Users } from 'lucide-react';
+import { Briefcase, CloudOff, LogOut, Settings, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,15 +17,18 @@ import { supabase } from '@/lib/supabase';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
-/** Cloud badge for proposal documents: synced / signed-out / error. */
+/**
+ * Quiet by default. Sync is automatic and always was — a permanent "Team
+ * cloud" light told you nothing, so the healthy state shows nothing at all.
+ * The two states that matter still speak up: signed out (the Sign in
+ * button) and a sync failure (your work is local only — say so loudly).
+ */
 function SyncBadge() {
   const status = useBuilderSyncStatus((s) => s.status);
   const { pathname } = useLocation();
-  if (status === 'off') return null;
+  if (status === 'off' || status === 'synced' || status === 'syncing') return null;
   if (status === 'signedOut')
     return (
-      // A real Sign in button, right where you are — lands on the sign-in
-      // card and comes straight back here afterward (?next=).
       <Link
         to={`/crm?next=${encodeURIComponent(pathname)}`}
         title="Sign in so proposals save to the team cloud and the CRM unlocks"
@@ -34,17 +37,14 @@ function SyncBadge() {
         <CloudOff className="h-3.5 w-3.5" /> Sign in
       </Link>
     );
-  const looks = {
-    syncing: { cls: 'text-brand-steel', label: 'Syncing…' },
-    synced: { cls: 'text-green-600', label: 'Team cloud' },
-    error: { cls: 'text-red-600', label: 'Sync error' },
-  } as const;
-  const l = looks[status];
   return (
-    <span title="Proposal documents are synced to the team cloud"
-      className={cn('flex items-center gap-1 px-2 py-1 text-xs', l.cls)}>
-      <Cloud className="h-3.5 w-3.5" /> <span className="hidden md:inline">{l.label}</span>
-    </span>
+    <button
+      onClick={() => window.location.reload()}
+      title="Changes are saving on this device but not reaching the team cloud. Click to reconnect."
+      className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+    >
+      <CloudOff className="h-3.5 w-3.5" /> Not syncing — reconnect
+    </button>
   );
 }
 
