@@ -6,18 +6,23 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Copy,
   Eye,
   FileDown,
   FileJson,
   FileSpreadsheet,
+  GitBranchPlus,
   Link2,
   Loader2,
   MoreHorizontal,
   Send,
   Trash2,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import type { Proposal } from '@/types';
+import { cn } from '@/lib/utils';
+import { familyLabel } from '@/lib/proposalFamily';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -60,6 +65,9 @@ export function TopBar({
   onExportJson,
   onSend,
   onDelete,
+  onRevise,
+  onAddOption,
+  onCopyForCustomer,
   crmControl,
 }: {
   proposal: Proposal;
@@ -74,6 +82,9 @@ export function TopBar({
   onExportJson: () => void;
   onSend: () => void;
   onDelete: () => void;
+  onRevise: () => void;
+  onAddOption: () => void;
+  onCopyForCustomer: () => void;
   crmControl?: React.ReactNode;
 }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
@@ -86,6 +97,7 @@ export function TopBar({
   // where "Done" returns to: the CRM card that launched this proposal, else home
   const from = (location.state as { from?: string } | null)?.from;
   const done = () => navigate(from ?? '/');
+  const label = familyLabel(proposal);
 
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
@@ -104,9 +116,24 @@ export function TopBar({
         </Button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="hidden whitespace-nowrap text-xs font-semibold text-brand-steel sm:inline">
+          {/* the full number fits on wide screens; elsewhere the short
+              "Option 2 · Rev B" chip keeps room for the project name */}
+          <span
+            className={cn(
+              'hidden whitespace-nowrap text-xs font-semibold text-brand-steel',
+              label ? '2xl:inline' : 'sm:inline'
+            )}
+          >
             {proposal.proposalNumber}
           </span>
+          {label && (
+            <span
+              title={proposal.proposalNumber}
+              className="hidden whitespace-nowrap rounded-full bg-brand-orange/10 px-2 py-0.5 text-[11px] font-semibold text-brand-orange sm:inline 2xl:hidden"
+            >
+              {label}
+            </span>
+          )}
           <input
             className="min-w-0 flex-1 bg-transparent font-heading text-lg font-bold uppercase tracking-wide outline-none focus:text-brand-orange"
             value={proposal.project.referenceName}
@@ -193,6 +220,10 @@ export function TopBar({
               <DropdownMenuItem onClick={onPreview}><Eye /> Preview</DropdownMenuItem>
               <DropdownMenuItem onClick={onShare}><Link2 /> Copy share link</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportPdf} disabled={pdfBusy}><FileDown /> Download PDF</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onRevise}><Copy /> Revise (keeps this version as sent)</DropdownMenuItem>
+              <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Add option</DropdownMenuItem>
+              <DropdownMenuItem onClick={onCopyForCustomer}><UserPlus /> Copy for another customer</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onExportEstimateCsv}><FileSpreadsheet /> QuickBooks Estimate CSV</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportCustomerCsv}><Users /> QuickBooks Customer CSV</DropdownMenuItem>

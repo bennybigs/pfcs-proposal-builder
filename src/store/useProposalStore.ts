@@ -10,6 +10,14 @@ import { debouncedLocalStorage, STORAGE_KEYS } from '@/store/persistence';
 import { uuid } from '@/lib/uuid';
 import { lastName } from '@/lib/format';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import {
+  buildNumber,
+  familyOf,
+  latestOf,
+  lineageOf,
+  nextOption,
+  nextRev,
+} from '@/lib/proposalFamily';
 
 export function cardFromTemplate(template: CardTemplate): Card {
   return {
@@ -32,7 +40,12 @@ interface ProposalsState {
   deleteProposal: (id: string) => void;
   archiveProposal: (id: string) => void;
   restoreProposal: (id: string) => void;
+  /** Fresh, unrelated copy (new number, no customer link) — for another customer. */
   duplicateProposal: (id: string) => Proposal | undefined;
+  /** Rev B of what was sent: same deal, same base number; the old one is kept as replaced. */
+  reviseProposal: (id: string) => Proposal | undefined;
+  /** Another option of the same quote, open side by side with the original. */
+  addOption: (id: string) => Proposal | undefined;
   importProposal: (proposal: Proposal) => Proposal;
 
   addCard: (proposalId: string, card: Card, index?: number) => void;
@@ -44,6 +57,26 @@ interface ProposalsState {
 
 function touch(proposal: Proposal): Proposal {
   return { ...proposal, updatedAt: new Date().toISOString() };
+}
+
+/** Deep copy as a brand-new draft — new ids, lifecycle flags cleared. */
+function cloneAsDraft(source: Proposal, patch: Partial<Proposal>): Proposal {
+  const now = new Date().toISOString();
+  const copy: Proposal = {
+    ...(JSON.parse(JSON.stringify(source)) as Proposal),
+    id: uuid(),
+    status: 'draft',
+    createdAt: now,
+    updatedAt: now,
+    cards: source.cards.map((c) => ({ ...c, id: uuid() })),
+    ...patch,
+  };
+  delete copy.archivedAt;
+  delete copy.deletedAt;
+  delete copy.deletedBy;
+  delete copy.supersededBy;
+  delete copy.notChosen;
+  return copy;
 }
 
 export const useProposalStore = create<ProposalsState>()(
@@ -101,7 +134,32 @@ export const useProposalStore = create<ProposalsState>()(
           return proposal;
         },
 
-        updateProposal: (id, patch) => mutate(id, (p) => ({ ...p, ...patch })),
+        updateProposal: (id, patch) => {
+          mutate(id, (p) => ({ ...p, ...patch }));
+          // signing one option settles the others: they become "not chosen"
+          // (still kept, still viewable). Reopening it doesn't undo this —
+          // the other options can be reopened from their own status control.
+          if (patch.status === 'accepted' || patch.status === 'contract') {
+            const all = get().proposals;
+            const chosen = all[id];
+            if (!chosen?.lineage?.option) return;
+            const option = chosen.lineage.option;
+            const next = { ...all };
+            let changed = false;
+            for (const q of familyOf(Object.values(all), chosen)) {
+              if (q.id === id || q.supersededBy || q.notChosen) continue;
+              if ((lineageOf(q).option ?? 1) === option) continue;
+              if (q.status === 'accepted' || q.status === 'contract') continue;
+              next[q.id] = touch({ ...q, notChosen: true, status: 'declined' });
+              changed = true;
+            }
+            if (changed) set({ proposals: next });
+          } else if (patch.status && patch.status !== 'declined') {
+            // reopening a proposal by hand clears the "not chosen" mark
+            const p = get().proposals[id];
+            if (p?.notChosen) mutate(id, (q) => ({ ...q, notChosen: undefined }));
+          }
+        },
 
         // Deleting writes a tombstone rather than dropping the record: the
         // deletion then syncs like any other edit and wins by last-write, so
@@ -123,17 +181,68 @@ export const useProposalStore = create<ProposalsState>()(
           const source = get().proposals[id];
           if (!source) return undefined;
           const lib = useLibraryStore.getState();
-          const now = new Date().toISOString();
-          const copy: Proposal = {
-            ...JSON.parse(JSON.stringify(source)),
-            id: uuid(),
+          const copy = cloneAsDraft(source, {
             proposalNumber: lib.consumeProposalNumber(),
-            status: 'draft',
-            createdAt: now,
-            updatedAt: now,
-            cards: source.cards.map((c) => ({ ...c, id: uuid() })),
-          };
+          });
+          // a copy for someone else starts its own history and its own link
+          delete copy.crm;
+          delete copy.lineage;
           set((s) => ({ proposals: { ...s.proposals, [copy.id]: copy } }));
+          return copy;
+        },
+
+        reviseProposal: (id) => {
+          const all = get().proposals;
+          if (!all[id]) return undefined;
+          const source = latestOf(all, all[id]); // always revise the newest
+          const l = lineageOf(source);
+          const lineage = { ...l, rev: nextRev(Object.values(all), source), from: source.id };
+          const copy = cloneAsDraft(source, {
+            lineage,
+            proposalNumber: buildNumber(lineage),
+          });
+          set((s) => ({
+            proposals: {
+              ...s.proposals,
+              [copy.id]: copy,
+              [source.id]: touch({ ...source, supersededBy: copy.id }),
+            },
+          }));
+          return copy;
+        },
+
+        addOption: (id) => {
+          const all = get().proposals;
+          if (!all[id]) return undefined;
+          const source = latestOf(all, all[id]);
+          const l = lineageOf(source);
+          const lineage = {
+            baseNumber: l.baseNumber,
+            option: nextOption(Object.values(all), source),
+            rev: 0,
+            from: source.id,
+          };
+          const copy = cloneAsDraft(source, {
+            lineage,
+            proposalNumber: buildNumber(lineage),
+          });
+          const next = { ...all, [copy.id]: copy };
+          // the first alternate makes the original "Option 1" — renumbered
+          // only while it's a draft, so a sent number never changes under
+          // the customer
+          if (!l.option) {
+            for (const q of familyOf(Object.values(all), source)) {
+              const ql = lineageOf(q);
+              if (ql.option) continue;
+              const lin = { baseNumber: ql.baseNumber, option: 1, rev: ql.rev, from: q.lineage?.from };
+              next[q.id] = touch({
+                ...q,
+                lineage: lin,
+                proposalNumber: q.status === 'draft' ? buildNumber(lin) : q.proposalNumber,
+              });
+            }
+          }
+          set({ proposals: next });
           return copy;
         },
 

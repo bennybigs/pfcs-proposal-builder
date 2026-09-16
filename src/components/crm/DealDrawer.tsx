@@ -12,6 +12,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  Copy,
+  GitBranchPlus,
   ExternalLink,
   Eye,
   FileText,
@@ -68,6 +70,8 @@ import {
   WonDialog,
 } from '@/components/crm/CardActions';
 import { useProposalStore } from '@/store/useProposalStore';
+import { createVersion } from '@/lib/crm/integration/versions';
+import { familyLabel, lockReason } from '@/lib/proposalFamily';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
 import { companySnapshot } from '@/lib/shareLink';
@@ -549,14 +553,35 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             </p>
           ) : (
             <div className="mt-2 grid gap-2">
-              {links.map((pl) => {
+              {[...links]
+                // open versions first; replaced / not-chosen sink to the bottom
+                .sort((a, b) => {
+                  const rank = (id: string) => {
+                    const lp = localProposals[id];
+                    return lp?.supersededBy || lp?.notChosen ? 1 : 0;
+                  };
+                  return rank(a.proposal_id) - rank(b.proposal_id);
+                })
+                .map((pl) => {
                 const local = localProposals[pl.proposal_id];
                 if (local?.deletedAt) return null; // deleted — tombstoned
                 // the live number when this device has the document, else the
                 // last one the server saw
                 const total = local ? Math.round(grandTotal(local)) : pl.total;
+                const label = local ? familyLabel(local) : '';
+                const closed = Boolean(local?.supersededBy || local?.notChosen);
+                const sent = local ? lockReason(local) === 'sent' : false;
+                const openVersion = (kind: 'revision' | 'option') => {
+                  const copy = createVersion(pl.proposal_id, kind, () =>
+                    qc.invalidateQueries({ queryKey: ['proposal_links'] })
+                  );
+                  if (copy)
+                    navigate(`/proposal/${copy.id}`, {
+                      state: { from: location.pathname + location.search },
+                    });
+                };
                 return (
-                  <div key={pl.id} className="rounded-md border p-2 text-sm">
+                  <div key={pl.id} className={cn('rounded-md border p-2 text-sm', closed && 'bg-brand-gray-bg opacity-70')}>
                     <button
                       className="flex w-full items-center gap-2 text-left hover:opacity-80"
                       onClick={() => local && setViewProposalId(pl.proposal_id)}
@@ -564,9 +589,32 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                       title={local ? 'View the proposal' : 'Not available on this device yet'}
                     >
                       <FileText className="h-3.5 w-3.5 shrink-0 text-brand-steel" />
-                      <span className="min-w-0 flex-1 truncate font-medium">{pl.title || 'Proposal'}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {local?.project.referenceName || pl.title || 'Proposal'}
+                      </span>
                       <span className="font-semibold text-brand-black">{formatDollars(total)}</span>
                     </button>
+                    {(label || closed || sent) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 pl-5 text-[11px]">
+                        {label && (
+                          <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 font-semibold text-brand-orange">
+                            {label}
+                          </span>
+                        )}
+                        {local?.supersededBy && (
+                          <span className="font-medium text-brand-steel">
+                            Replaced by {localProposals[local.supersededBy] ? familyLabel(localProposals[local.supersededBy]) : 'a newer revision'} — kept as sent
+                          </span>
+                        )}
+                        {local?.notChosen && <span className="font-medium text-brand-steel">Not chosen</span>}
+                        {!closed && local && local.status !== 'draft' && (
+                          <span className="font-medium text-brand-steel">
+                            {local.status === 'contract' ? 'Signed' : local.status === 'accepted' ? 'Accepted' : 'Sent'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {!closed && (
                     <label className="mt-1.5 flex items-center gap-2 text-xs text-brand-black">
                       <input
                         type="checkbox"
@@ -579,6 +627,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                         <span className="text-brand-steel">— updates itself when you edit</span>
                       )}
                     </label>
+                    )}
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {local && (
                         <Button
@@ -600,7 +649,29 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                             })
                           }
                         >
-                          <Pencil className="mr-1 h-3 w-3" /> Edit
+                          <Pencil className="mr-1 h-3 w-3" /> {sent || closed ? 'Open' : 'Edit'}
+                        </Button>
+                      )}
+                      {local && !closed && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          title="Change what they're getting — the current version is kept as sent"
+                          onClick={() => openVersion('revision')}
+                        >
+                          <Copy className="mr-1 h-3 w-3" /> Revise
+                        </Button>
+                      )}
+                      {local && !closed && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          title="Give the customer another version to choose from"
+                          onClick={() => openVersion('option')}
+                        >
+                          <GitBranchPlus className="mr-1 h-3 w-3" /> Add option
                         </Button>
                       )}
                       {pl.share_url && (

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { GripVertical, Plus, Search } from 'lucide-react';
+import { GripVertical, Plus, Search, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +11,11 @@ import {
 } from '@/components/ui/accordion';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { CATEGORY_META, CATEGORY_ORDER } from '@/constants/defaults';
-import type { CardTemplate } from '@/types';
+import type { Card, CardTemplate, Proposal } from '@/types';
+import { useProposalStore } from '@/store/useProposalStore';
+import { familyLabel } from '@/lib/proposalFamily';
+import { formatCurrency } from '@/lib/format';
+import { cardMarkedPrice } from '@/lib/pricing';
 import { cn } from '@/lib/utils';
 
 function LibraryItem({
@@ -64,9 +68,37 @@ function LibraryItem({
   );
 }
 
-export function LibrarySidebar({ onAdd }: { onAdd: (template: CardTemplate) => void }) {
+export function LibrarySidebar({
+  onAdd,
+  proposal,
+  onAddCard,
+}: {
+  onAdd: (template: CardTemplate) => void;
+  /** With these, a second tab offers cards from the customer's other proposals. */
+  proposal?: Proposal;
+  onAddCard?: (card: Card) => void;
+}) {
   const templates = useLibraryStore((s) => s.templates);
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<'library' | 'theirs'>('library');
+  const allProposals = useProposalStore((s) => s.proposals);
+
+  // the customer's other proposals: same CRM contact, else same name
+  const theirs = useMemo(() => {
+    if (!proposal) return [];
+    const name = proposal.customer.fullName.trim().toLowerCase();
+    return Object.values(allProposals)
+      .filter(
+        (p) =>
+          p.id !== proposal.id &&
+          !p.deletedAt &&
+          p.cards.length > 0 &&
+          (proposal.crm
+            ? p.crm?.contactId === proposal.crm.contactId
+            : Boolean(name) && p.customer.fullName.trim().toLowerCase() === name)
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }, [allProposals, proposal]);
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -81,6 +113,31 @@ export function LibrarySidebar({ onAdd }: { onAdd: (template: CardTemplate) => v
 
   return (
     <div className="flex h-full flex-col">
+      {proposal && onAddCard && (
+        <div className="flex border-b bg-white text-xs font-semibold">
+          {(
+            [
+              ['library', 'Card library'],
+              ['theirs', `Their other proposals${theirs.length ? ` (${theirs.length})` : ''}`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                'flex-1 border-b-2 px-2 py-2',
+                tab === key ? 'border-brand-orange text-brand-orange' : 'border-transparent text-brand-steel'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'theirs' && proposal && onAddCard ? (
+        <TheirCards proposals={theirs} current={proposal} query={query} setQuery={setQuery} onAddCard={onAddCard} />
+      ) : (
+      <>
       <div className="border-b p-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-brand-steel" />
@@ -117,6 +174,99 @@ export function LibrarySidebar({ onAdd }: { onAdd: (template: CardTemplate) => v
           <p className="mt-6 text-center text-sm text-brand-steel">No cards match "{query}"</p>
         )}
       </div>
+      </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Mix and match: every card from this customer's other proposals (options,
+ * earlier revisions, old quotes), with its price, one tap to pull a copy in.
+ */
+function TheirCards({
+  proposals,
+  current,
+  query,
+  setQuery,
+  onAddCard,
+}: {
+  proposals: Proposal[];
+  current: Proposal;
+  query: string;
+  setQuery: (q: string) => void;
+  onAddCard: (card: Card) => void;
+}) {
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const titles = new Set(current.cards.map((c) => c.title.trim().toLowerCase()));
+  return (
+    <>
+      <div className="border-b p-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-brand-steel" />
+          <Input
+            placeholder="Search their cards…"
+            className="pl-8"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="flex-1 space-y-4 overflow-y-auto px-3 py-3 pb-6">
+        {proposals.length === 0 && (
+          <p className="mt-4 text-center text-sm text-brand-steel">
+            {current.customer.fullName || 'This customer'} has no other proposals yet. Options and
+            revisions you make will show up here.
+          </p>
+        )}
+        {proposals.map((p) => {
+          const q = query.trim().toLowerCase();
+          const cards = p.cards.filter((c) => !q || c.title.toLowerCase().includes(q));
+          if (!cards.length) return null;
+          const label = familyLabel(p);
+          return (
+            <div key={p.id}>
+              <div className="mb-1 font-heading text-xs font-bold uppercase tracking-wider text-brand-steel">
+                {p.project.referenceName || p.proposalNumber}
+                {label && <span className="ml-1 text-brand-orange">· {label}</span>}
+              </div>
+              <div className="space-y-0.5">
+                {cards.map((c) => {
+                  const price = cardMarkedPrice(c) ?? null;
+                  const isAdded = added.has(c.id);
+                  const already = titles.has(c.title.trim().toLowerCase());
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        onAddCard(c);
+                        setAdded((s) => new Set(s).add(c.id));
+                      }}
+                      title={already ? 'A card with this name is already in this proposal — adds another copy' : 'Add a copy of this card'}
+                      className="group flex w-full items-center gap-1.5 rounded-md border border-transparent px-1.5 py-1.5 text-left text-sm hover:border-brand-gray-light hover:bg-white"
+                    >
+                      {isAdded ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5 shrink-0 text-brand-steel group-hover:text-brand-orange" />
+                      )}
+                      <span className={cn('min-w-0 flex-1 truncate', !c.isEnabled && 'text-brand-steel line-through')}>
+                        {c.title}
+                      </span>
+                      {already && !isAdded && (
+                        <span className="shrink-0 text-[10px] text-brand-steel">in this one</span>
+                      )}
+                      {price !== null && (
+                        <span className="shrink-0 text-xs text-brand-steel">{formatCurrency(price)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

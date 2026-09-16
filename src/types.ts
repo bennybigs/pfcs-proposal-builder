@@ -32,6 +32,18 @@ export interface Proposal {
    *  proposals that never touched the CRM — fully backward-compatible. */
   crm?: { contactId: string; dealId: string };
 
+  /**
+   * Revisions and options of one quote share a base number. Absent on a
+   * proposal that has never been revised or given alternates.
+   *   option — 1, 2, 3… when the customer is choosing between versions
+   *   rev    — 0 original, 1 = Rev B, 2 = Rev C…
+   */
+  lineage?: { baseNumber: string; option?: number; rev?: number; from?: string };
+  /** Set on the older version when a revision replaces it (the newer id). */
+  supersededBy?: string;
+  /** Another option of the same quote was accepted/signed. */
+  notChosen?: boolean;
+
   /** Archived: out of the working list, everything kept, restorable. */
   archivedAt?: string;
   /**

@@ -20,11 +20,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
+import type { Proposal } from '@/types';
 import { SEED_PROPOSAL_TEMPLATES } from '@/constants/seedProposalTemplates';
 import { useProposalStore } from '@/store/useProposalStore';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { createDeal, listDealsForContact } from '@/lib/crm/api/deals';
-import { createProposalForContact } from '@/lib/crm/integration/newProposal';
+import { copyProposalForContact, createProposalForContact } from '@/lib/crm/integration/newProposal';
 import { normalizePhone, formatPhone } from '@/lib/crm/phone';
 import { findDuplicateContact, duplicateReason, type DuplicateMatch } from '@/lib/crm/dedupe';
 import { STAGE_META, formatDollars, type Contact, type Deal } from '@/lib/crm/types';
@@ -40,9 +41,12 @@ type Step = 'customer' | 'template' | 'which-deal';
 export function TemplatePickerDialog({
   open,
   onOpenChange,
+  copyFrom,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** "Copy for another customer": same customer-first flow, no template step. */
+  copyFrom?: Proposal;
 }) {
   const navigate = useNavigate();
   const createProposal = useProposalStore((s) => s.createProposal);
@@ -142,7 +146,8 @@ export function TemplatePickerDialog({
         .single();
       if (error) throw error;
       setPicked(data as Contact);
-      setStep('template');
+      if (copyFrom) await create(undefined, data as Contact);
+      else setStep('template');
     } catch (err) {
       toast.error('Could not create contact', err instanceof Error ? err.message : String(err));
     } finally {
@@ -161,19 +166,23 @@ export function TemplatePickerDialog({
       if (open.length > 1) {
         setDealChoices(open);
         setStep('which-deal');
+      } else if (copyFrom) {
+        await create(open[0], contact, open);
       } else {
         setDealChoices(open); // 0 or 1 — resolved at create time
         setStep('template');
       }
     } catch {
       setDealChoices([]);
-      setStep('template');
+      if (!copyFrom) setStep('template');
     } finally {
       setBusy(false);
     }
   };
 
-  const create = async (deal?: Deal) => {
+  const create = async (deal?: Deal, who: Contact | null = picked, choices: Deal[] = dealChoices) => {
+    const picked = who;
+    const dealChoices = choices;
     setBusy(true);
     try {
       // no CRM configured (env-less deployment) — original behavior
@@ -191,7 +200,10 @@ export function TemplatePickerDialog({
           title: `${picked.name} — new project`,
           segment: 'other',
         }));
-      const id = await createProposalForContact(picked, target, selectedTemplate);
+      const id = copyFrom
+        ? await copyProposalForContact(copyFrom.id, picked, target)
+        : await createProposalForContact(picked, target, selectedTemplate);
+      if (copyFrom) toast.success(`Copied for ${picked.name}`, 'Same cards and prices — a new number and its own history.');
       onOpenChange(false);
       navigate(`/proposal/${id}`, { state: { from: '/' } });
     } catch (err) {
@@ -205,10 +217,12 @@ export function TemplatePickerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Proposal</DialogTitle>
+          <DialogTitle>{copyFrom ? 'Copy for another customer' : 'New Proposal'}</DialogTitle>
           <DialogDescription>
             {step === 'customer'
-              ? 'Who is this for? Every proposal belongs to a customer record.'
+              ? copyFrom
+                ? `Who gets a copy of ${copyFrom.proposalNumber}? Same cards and prices, a new number.`
+                : 'Who is this for? Every proposal belongs to a customer record.'
               : step === 'which-deal'
                 ? `${picked?.name} has more than one open job — which is this proposal for?`
                 : `For ${picked?.name ?? 'a new customer'} — pick a starting template.`}
@@ -360,7 +374,7 @@ export function TemplatePickerDialog({
                 <span className="text-brand-steel">{formatDollars(d.value)}</span>
               </button>
             ))}
-            <Button variant="outline" onClick={() => { setDealChoices([]); setStep('template'); }}>
+            <Button variant="outline" onClick={() => { setDealChoices([]); if (copyFrom) void create(undefined, picked, []); else setStep('template'); }}>
               <Plus className="mr-1.5 h-4 w-4" /> A new job instead
             </Button>
           </div>

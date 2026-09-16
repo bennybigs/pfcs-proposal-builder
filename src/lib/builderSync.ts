@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { linkTitle } from '@/lib/proposalFamily';
 import { grandTotal } from '@/lib/pricing';
 import type { Proposal } from '@/types';
 
@@ -109,14 +110,25 @@ export function useBuilderCloudSync(): void {
         if (dealId) {
           try {
             const total = Math.round(grandTotal(p));
-            const title = p.project.referenceName || p.customer.fullName || p.proposalNumber;
+            const title = linkTitle(p);
             const { data: rows } = await sb
               .from('proposal_links')
               .update({ total, title })
               .eq('deal_id', dealId)
               .eq('proposal_id', p.id)
               .select('counts_toward_value');
-            if (rows?.[0]?.counts_toward_value) {
+            let counts = Boolean(rows?.[0]?.counts_toward_value);
+            // the option the customer accepted/signed IS the deal's value now
+            if (rows?.length && !counts && (p.status === 'accepted' || p.status === 'contract')) {
+              await sb.from('proposal_links').update({ counts_toward_value: false }).eq('deal_id', dealId);
+              await sb
+                .from('proposal_links')
+                .update({ counts_toward_value: true })
+                .eq('deal_id', dealId)
+                .eq('proposal_id', p.id);
+              counts = true;
+            }
+            if (counts) {
               await sb.from('deals').update({ value: total }).eq('id', dealId);
             }
           } catch {

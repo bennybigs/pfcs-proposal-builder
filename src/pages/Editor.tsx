@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   PointerSensor,
@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { ArrowLeft, Check, MoveLeft, Plus, X } from 'lucide-react';
+import { ArrowLeft, Check, Copy, GitBranchPlus, Lock, MoveLeft, Plus, X } from 'lucide-react';
 import type { Card, CardTemplate } from '@/types';
 import { TopBar, type SaveStatus } from '@/components/layout/TopBar';
 import { LibrarySidebar } from '@/components/editor/LibrarySidebar';
@@ -41,13 +41,20 @@ import {
   generateEstimateCsv,
 } from '@/lib/qbCsvExport';
 import { lastName } from '@/lib/format';
+import { uuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
+import { familyLabel, familyOf, latestOf, lockReason } from '@/lib/proposalFamily';
+import { createVersion } from '@/lib/crm/integration/versions';
+import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
+import { formatDateUS } from '@/lib/format';
 
 type MobileTab = 'library' | 'proposal' | 'editor';
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const allProposals = useProposalStore((s) => s.proposals);
   const [searchParams, setSearchParams] = useSearchParams();
   const proposal = useProposalStore((s) => (id ? s.proposals[id] : undefined));
   const settings = useLibraryStore((s) => s.settings);
@@ -67,6 +74,9 @@ export default function Editor() {
   const [signedBanner, setSignedBanner] = useState<string | null>(null);
   const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  // "Edit this version anyway" — per visit, never remembered
+  const [unlockedId, setUnlockedId] = useState<string | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const cardPdfContainerRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +151,21 @@ export default function Editor() {
       </div>
     );
   }
+
+  const reason = lockReason(proposal);
+  const locked = Boolean(reason) && unlockedId !== proposal.id;
+  const inert = locked ? ({ inert: '' } as Record<string, string>) : {};
+  const newest = latestOf(allProposals, proposal);
+  const chosen =
+    reason === 'not-chosen'
+      ? familyOf(Object.values(allProposals), proposal).find(
+          (q) => !q.supersededBy && (q.status === 'accepted' || q.status === 'contract')
+        )
+      : undefined;
+  const openVersion = (kind: 'revision' | 'option') => {
+    const copy = createVersion(proposal.id, kind);
+    if (copy) navigate(`/proposal/${copy.id}`, { state: location.state });
+  };
 
   const handleAddTemplate = (template: CardTemplate, index?: number) => {
     const card = cardFromTemplate(template);
@@ -254,6 +279,9 @@ export default function Editor() {
         }
         onExportJson={handleExportJson}
         onSend={() => setSendOpen(true)}
+        onRevise={() => openVersion('revision')}
+        onAddOption={() => openVersion('option')}
+        onCopyForCustomer={() => setCopyOpen(true)}
         onDelete={() => {
           deleteProposal(proposal.id);
           navigate('/');
@@ -290,13 +318,22 @@ export default function Editor() {
           <aside
             className={cn(
               'w-full shrink-0 overflow-hidden border-r bg-brand-gray-bg lg:block lg:w-[280px]',
-              mobileTab === 'library' ? 'block' : 'hidden'
+              mobileTab === 'library' ? 'block' : 'hidden',
+              locked && 'opacity-50'
             )}
+            {...inert}
           >
             <LibrarySidebar
               onAdd={(t) => {
                 handleAddTemplate(t);
                 setMobileTab('proposal');
+              }}
+              proposal={proposal}
+              onAddCard={(c) => {
+                const card = { ...c, id: uuid() };
+                addCard(proposal.id, card);
+                setSelectedCardId(card.id);
+                toast.success(`Added “${c.title}”`, 'A copy — changing it here leaves the other proposal alone.');
               }}
             />
           </aside>
@@ -329,6 +366,23 @@ export default function Editor() {
                   </button>
                 </div>
               )}
+              {reason && (
+                <VersionBanner
+                  reason={reason}
+                  locked={locked}
+                  proposal={proposal}
+                  newestLabel={newest.id !== proposal.id ? familyLabel(newest) || newest.proposalNumber : ''}
+                  chosenLabel={chosen ? familyLabel(chosen) || chosen.proposalNumber : ''}
+                  onOpen={(pid) => navigate(`/proposal/${pid}`, { state: location.state })}
+                  newestId={newest.id}
+                  chosenId={chosen?.id}
+                  onRevise={() => openVersion('revision')}
+                  onAddOption={() => openVersion('option')}
+                  onUnlock={() => setUnlockedId(proposal.id)}
+                  onLock={() => setUnlockedId(null)}
+                />
+              )}
+              <div className={cn('space-y-5', locked && 'select-text')} {...inert}>
               <CustomerBlock proposal={proposal} />
 
               <div className="rounded-lg bg-white p-4 shadow-sm">
@@ -395,6 +449,7 @@ export default function Editor() {
                   onChange={(e) => updateProposal(proposal.id, { disclaimers: e.target.value })}
                 />
               </div>
+              </div>
 
               {/* Fixed acceptance block preview — not editable, not removable */}
               <div className="relative">
@@ -438,6 +493,7 @@ export default function Editor() {
               mobileTab === 'editor' ? 'block' : 'hidden',
               showRightPanel ? 'lg:block' : 'lg:hidden'
             )}
+            {...inert}
           >
             {selectedCard ? (
               <CardEditorPanel
@@ -458,6 +514,8 @@ export default function Editor() {
           </aside>
         </div>
       </DndContext>
+
+      <TemplatePickerDialog open={copyOpen} onOpenChange={setCopyOpen} copyFrom={proposal} />
 
       <SendProposalDialog
         open={sendOpen}
@@ -546,6 +604,112 @@ export default function Editor() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Sent proposals are the record of what the customer was quoted, so they
+ * open read-only with the two ways forward front and centre. Nothing is
+ * hidden: the page stays readable, and "Edit this version anyway" is there
+ * for the typo that genuinely doesn't need a revision.
+ */
+function VersionBanner({
+  reason,
+  locked,
+  proposal,
+  newestLabel,
+  newestId,
+  chosenLabel,
+  chosenId,
+  onOpen,
+  onRevise,
+  onAddOption,
+  onUnlock,
+  onLock,
+}: {
+  reason: 'sent' | 'superseded' | 'not-chosen';
+  locked: boolean;
+  proposal: { status: string; updatedAt: string; proposalNumber: string };
+  newestLabel: string;
+  newestId: string;
+  chosenLabel: string;
+  chosenId?: string;
+  onOpen: (id: string) => void;
+  onRevise: () => void;
+  onAddOption: () => void;
+  onUnlock: () => void;
+  onLock: () => void;
+}) {
+  if (!locked) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+        <span className="min-w-0 flex-1">
+          <strong>Editing a {reason === 'sent' ? 'sent' : 'closed'} version.</strong> The customer&apos;s
+          copy won&apos;t change — resend it if they need to see this.
+        </span>
+        <Button size="sm" variant="outline" onClick={onLock}>
+          <Lock className="h-3.5 w-3.5" /> Done editing
+        </Button>
+      </div>
+    );
+  }
+  const title =
+    reason === 'superseded'
+      ? `Replaced by ${newestLabel}`
+      : reason === 'not-chosen'
+        ? chosenLabel
+          ? `Not chosen — the customer went with ${chosenLabel}`
+          : 'Not chosen'
+        : proposal.status === 'contract'
+          ? 'Signed — this is the contract'
+          : proposal.status === 'accepted'
+            ? 'Accepted by the customer'
+            : `Sent to the customer${proposal.status === 'sent' ? '' : ` (${proposal.status})`}`;
+  return (
+    <div className="rounded-lg border-2 border-brand-orange bg-brand-orange/5 p-4">
+      <div className="flex items-start gap-3">
+        <Lock className="mt-0.5 h-5 w-5 shrink-0 text-brand-orange" />
+        <div className="min-w-0 flex-1 text-sm text-brand-black">
+          <div className="font-heading text-base font-bold uppercase tracking-wide">{title}</div>
+          <p className="mt-0.5 text-brand-steel">
+            {reason === 'sent'
+              ? `${proposal.proposalNumber} is kept exactly as the customer saw it. To change what they're getting, make a revision; to give them a choice, add an option.`
+              : `${proposal.proposalNumber} is kept for the record (last changed ${formatDateUS(proposal.updatedAt)}).`}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {reason === 'superseded' && (
+          <Button size="sm" onClick={() => onOpen(newestId)}>
+            Open {newestLabel}
+          </Button>
+        )}
+        {reason === 'not-chosen' && chosenId && (
+          <Button size="sm" onClick={() => onOpen(chosenId)}>
+            Open {chosenLabel}
+          </Button>
+        )}
+        {reason === 'sent' && (
+          <>
+            <Button size="sm" onClick={onRevise}>
+              <Copy className="h-3.5 w-3.5" /> Revise
+            </Button>
+            {/* once signed there's nothing left to choose between */}
+            {proposal.status !== 'contract' && proposal.status !== 'accepted' && (
+              <Button size="sm" variant="outline" onClick={onAddOption}>
+                <GitBranchPlus className="h-3.5 w-3.5" /> Add option
+              </Button>
+            )}
+          </>
+        )}
+        <button
+          className="ml-auto text-xs text-brand-steel underline-offset-2 hover:text-brand-black hover:underline"
+          onClick={onUnlock}
+        >
+          Edit this version anyway
+        </button>
+      </div>
     </div>
   );
 }

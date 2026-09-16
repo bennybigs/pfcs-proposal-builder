@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Archive, Copy, FileSignature, Link2 as LinkIcon, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Archive, Copy, FileSignature, GitBranchPlus, History, UserPlus, Link2 as LinkIcon, MoreHorizontal, Plus, Trash2, Undo2 } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { Button } from '@/components/ui/button';
@@ -26,25 +26,31 @@ import { STATUS_META } from '@/constants/defaults';
 import { toast } from '@/components/ui/toast';
 import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
+import { createVersion } from '@/lib/crm/integration/versions';
+import { familyLabel } from '@/lib/proposalFamily';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const proposals = useProposalStore((s) => s.proposals);
   const deleteProposal = useProposalStore((s) => s.deleteProposal);
-  const duplicateProposal = useProposalStore((s) => s.duplicateProposal);
   const updateProposal = useProposalStore((s) => s.updateProposal);
   const archiveProposal = useProposalStore((s) => s.archiveProposal);
   const restoreProposal = useProposalStore((s) => s.restoreProposal);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Proposal | null>(null);
+  const [copyTarget, setCopyTarget] = useState<Proposal | null>(null);
+  const [showReplaced, setShowReplaced] = useState(false);
 
   // deleted proposals live on as tombstones so the deletion can sync — they
   // are never shown anywhere
   const all = Object.values(proposals)
     .filter((p) => !p.deletedAt)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  const active = all.filter((p) => !p.archivedAt);
+  // a revised proposal is represented by its newest version; the versions it
+  // replaced are one tap away ("Show replaced versions"), never lost
+  const replaced = all.filter((p) => p.supersededBy && !p.archivedAt);
+  const active = all.filter((p) => !p.archivedAt && !p.supersededBy);
   const list = active.filter((p) => p.status !== 'contract');
   const contracts = active.filter((p) => p.status === 'contract');
   const archived = all.filter((p) => p.archivedAt);
@@ -54,6 +60,12 @@ export default function Dashboard() {
       {items.map((p) => {
         const status = STATUS_META[p.status] ?? STATUS_META.draft;
         const isContract = p.status === 'contract';
+        const label = familyLabel(p);
+        const earlier = p.lineage?.rev ? all.filter((q) => q.supersededBy && q.lineage?.baseNumber === p.lineage?.baseNumber && (q.lineage?.option ?? 0) === (p.lineage?.option ?? 0)).length : 0;
+        const openVersion = (kind: 'revision' | 'option') => {
+          const copy = createVersion(p.id, kind);
+          if (copy) navigate(`/proposal/${copy.id}`);
+        };
         return (
           <div
             key={p.id}
@@ -67,13 +79,31 @@ export default function Dashboard() {
               <div className="flex items-start justify-between gap-2 pr-8">
                 <div className="text-xs font-semibold text-brand-steel">{p.proposalNumber}</div>
                 <Badge className={status.className} variant="secondary">
-                  {p.archivedAt ? 'Archived' : status.label}
+                  {p.archivedAt
+                    ? 'Archived'
+                    : p.supersededBy
+                      ? 'Replaced'
+                      : p.notChosen
+                        ? 'Not chosen'
+                        : status.label}
                 </Badge>
               </div>
               <div className="mt-1 font-heading text-lg font-bold uppercase tracking-wide">
                 {p.project.referenceName || 'Untitled Project'}
               </div>
               <div className="text-sm text-brand-steel">{p.customer.fullName}</div>
+              {label && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 font-semibold text-brand-orange">
+                    {label}
+                  </span>
+                  {earlier > 0 && (
+                    <span className="flex items-center gap-1 text-brand-steel">
+                      <History className="h-3 w-3" /> replaces {earlier} earlier version{earlier === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
+              )}
               {!p.crm && (
                 <div className="mt-2 flex items-center gap-1 text-[11px] font-medium text-amber-700">
                   <LinkIcon className="h-3 w-3" /> Not linked to a customer — open it and use
@@ -108,13 +138,14 @@ export default function Dashboard() {
                       <FileSignature /> Mark as Contract
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const copy = duplicateProposal(p.id);
-                      if (copy) navigate(`/proposal/${copy.id}`);
-                    }}
-                  >
-                    <Copy /> Duplicate
+                  <DropdownMenuItem onClick={() => openVersion('revision')}>
+                    <Copy /> Revise
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openVersion('option')}>
+                    <GitBranchPlus /> Add option
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setCopyTarget(p)}>
+                    <UserPlus /> Copy for another customer
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {p.archivedAt ? (
@@ -183,6 +214,20 @@ export default function Dashboard() {
           </>
         )}
 
+        {replaced.length > 0 && (
+          <>
+            <div className="mb-6 mt-12 flex items-center gap-3">
+              <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-brand-steel">
+                Replaced versions
+              </h1>
+              <Button variant="outline" size="sm" onClick={() => setShowReplaced(!showReplaced)}>
+                {showReplaced ? 'Hide' : `Show (${replaced.length})`}
+              </Button>
+            </div>
+            {showReplaced && renderGrid(replaced)}
+          </>
+        )}
+
         {archived.length > 0 && (
           <>
             <div className="mb-6 mt-12 flex items-center gap-3">
@@ -199,6 +244,11 @@ export default function Dashboard() {
       </main>
 
       <TemplatePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} />
+      <TemplatePickerDialog
+        open={!!copyTarget}
+        onOpenChange={(o) => !o && setCopyTarget(null)}
+        copyFrom={copyTarget ?? undefined}
+      />
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-md">
