@@ -12,6 +12,7 @@ import { supabase, CRM_ENABLED } from '@/lib/supabase';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { linkTitle } from '@/lib/proposalFamily';
+import { settleProposalNumbers } from '@/lib/proposalNumbers';
 import { grandTotal } from '@/lib/pricing';
 import type { Proposal } from '@/types';
 
@@ -72,6 +73,13 @@ export function useBuilderCloudSync(): void {
 
     const pushDirty = async () => {
       const who = await email();
+      // new proposals get their team-wide number before they reach the
+      // server; if that fails they push as-is and settle on the next pass
+      try {
+        await settleProposalNumbers(sb);
+      } catch {
+        /* retried on the next push */
+      }
       const local = useProposalStore.getState().proposals;
       const dirty = Object.values(local).filter(
         (p) => lastPushed.get(p.id) !== (p.updatedAt ?? '')

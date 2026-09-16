@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { InstallAppButton } from '@/components/layout/InstallAppButton';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatProposalNumber } from '@/lib/proposalNumber';
 import { MAX_EMBEDDED_LOGO_CHARS } from '@/lib/shareLink';
 import { toast } from '@/components/ui/toast';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Downscale an uploaded logo to display size and re-encode it so the data URL
@@ -58,6 +59,37 @@ export default function Settings() {
   const settings = useLibraryStore((s) => s.settings);
   const updateSettings = useLibraryStore((s) => s.updateSettings);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  // "Next number" is the team-wide counter in the database, not a setting on
+  // this device — read it on open, write it (admins) when the field is left
+  const [nextDraft, setNextDraft] = useState(String(settings.nextProposalNumber));
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.rpc('peek_next_proposal_number').then(({ data }) => {
+      if (typeof data === 'number') {
+        setNextDraft(String(data));
+        if (data !== useLibraryStore.getState().settings.nextProposalNumber) {
+          updateSettings({ nextProposalNumber: data });
+        }
+      }
+    });
+  }, [updateSettings]);
+  const saveNext = async () => {
+    const n = Math.max(1, Math.floor(Number(nextDraft) || 1));
+    setNextDraft(String(n));
+    if (n === settings.nextProposalNumber) return;
+    if (!supabase) {
+      updateSettings({ nextProposalNumber: n });
+      return;
+    }
+    const { error } = await supabase.rpc('set_next_proposal_number', { p_next: n });
+    if (error) {
+      setNextDraft(String(settings.nextProposalNumber));
+      toast.error('Numbering not changed', error.message);
+      return;
+    }
+    updateSettings({ nextProposalNumber: n });
+    toast.success('Next proposal number updated', 'Numbers already used are skipped automatically.');
+  };
 
   const handleLogoUpload = async (file: File) => {
     try {
@@ -190,19 +222,20 @@ export default function Settings() {
                 <Input
                   type="number"
                   min={1}
-                  value={settings.nextProposalNumber}
-                  onChange={(e) =>
-                    updateSettings({ nextProposalNumber: Math.max(1, Number(e.target.value) || 1) })
-                  }
+                  value={nextDraft}
+                  onChange={(e) => setNextDraft(e.target.value)}
+                  onBlur={() => void saveNext()}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                 />
               </div>
             </div>
             <p className="text-xs text-brand-steel">
               Next proposal will be numbered{' '}
               <span className="font-semibold">
-                {formatProposalNumber(settings.proposalNumberPrefix, settings.nextProposalNumber)}
+                {formatProposalNumber(settings.proposalNumberPrefix, Math.max(1, Number(nextDraft) || 1))}
               </span>
-              .
+              . One counter for the whole team, so two people never get the same number, and any
+              number already used is skipped.
             </p>
           </section>
 

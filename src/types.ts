@@ -39,6 +39,11 @@ export interface Proposal {
    *   rev    — 0 original, 1 = Rev B, 2 = Rev C…
    */
   lineage?: { baseNumber: string; option?: number; rev?: number; from?: string };
+  /**
+   * The number is provisional (made on this device) until the team-wide
+   * counter confirms it on the next sync. Only drafts are ever renumbered.
+   */
+  numberPending?: boolean;
   /** Set on the older version when a revision replaces it (the newer id). */
   supersededBy?: string;
   /** Another option of the same quote was accepted/signed. */

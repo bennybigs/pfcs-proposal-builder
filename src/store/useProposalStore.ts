@@ -76,6 +76,7 @@ function cloneAsDraft(source: Proposal, patch: Partial<Proposal>): Proposal {
   delete copy.deletedBy;
   delete copy.supersededBy;
   delete copy.notChosen;
+  delete copy.numberPending; // a version shares its family's number
   return copy;
 }
 
@@ -105,6 +106,7 @@ export const useProposalStore = create<ProposalsState>()(
           const proposal: Proposal = {
             id: uuid(),
             proposalNumber: lib.consumeProposalNumber(),
+            numberPending: true,
             status: 'draft',
             createdAt: now,
             updatedAt: now,
@@ -183,6 +185,7 @@ export const useProposalStore = create<ProposalsState>()(
           const lib = useLibraryStore.getState();
           const copy = cloneAsDraft(source, {
             proposalNumber: lib.consumeProposalNumber(),
+            numberPending: true,
           });
           // a copy for someone else starts its own history and its own link
           delete copy.crm;

@@ -748,3 +748,71 @@ alter table public.deals add column if not exists held_until date,
                          add column if not exists archived_at timestamptz,
                          add column if not exists archive_reason text;
 alter table public.deals alter column stage set default 'lead';
+
+-- ── proposal numbers: one team-wide counter ────────────────────────────
+-- The old counter lived in each device's settings (a last-write-wins doc),
+-- so two devices handed out the same number. Numbers now come from here,
+-- one at a time under a row lock, and a number already on any proposal
+-- (live, deleted or as a revision/option base) is skipped — so a manual
+-- reset in Settings can never produce a duplicate either.
+create table if not exists public.proposal_number_counter (
+  id          int primary key default 1 check (id = 1),
+  last_number int not null default 0
+);
+alter table public.proposal_number_counter enable row level security;  -- functions only
+insert into public.proposal_number_counter (id, last_number)
+select 1, greatest(0, coalesce((select (data->'settings'->>'nextProposalNumber')::int - 1
+                                  from public.builder_shared where key = 'library'), 0))
+on conflict (id) do nothing;
+
+create or replace function public.proposal_number_taken(candidate text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.proposals
+     where data->>'proposalNumber' = candidate
+        or data->>'proposalNumber' like candidate || ' %'
+        or data->'lineage'->>'baseNumber' = candidate
+  );
+$$;
+
+create or replace function public.claim_proposal_number(p_prefix text) returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  n int;
+  candidate text;
+begin
+  if not public.is_team_member() then
+    raise exception 'Only team members can number proposals';
+  end if;
+  loop
+    update public.proposal_number_counter set last_number = last_number + 1
+     where id = 1 returning last_number into n;
+    candidate := coalesce(p_prefix, '') ||
+      case when length(n::text) >= 4 then n::text else lpad(n::text, 4, '0') end;
+    exit when not public.proposal_number_taken(candidate);
+  end loop;
+  return candidate;
+end $$;
+
+create or replace function public.peek_next_proposal_number() returns int
+language sql stable security definer set search_path = public as $$
+  select last_number + 1 from public.proposal_number_counter where id = 1;
+$$;
+
+create or replace function public.set_next_proposal_number(p_next int) returns int
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_team_admin() then
+    raise exception 'Only an admin can change proposal numbering';
+  end if;
+  update public.proposal_number_counter set last_number = greatest(0, p_next - 1) where id = 1;
+  return greatest(1, p_next);
+end $$;
+
+revoke all on function public.claim_proposal_number(text) from public, anon;
+revoke all on function public.set_next_proposal_number(int) from public, anon;
+revoke all on function public.peek_next_proposal_number() from public, anon;
+revoke all on function public.proposal_number_taken(text) from public, anon;
+grant execute on function public.claim_proposal_number(text) to authenticated;
+grant execute on function public.set_next_proposal_number(int) to authenticated;
+grant execute on function public.peek_next_proposal_number() to authenticated;
