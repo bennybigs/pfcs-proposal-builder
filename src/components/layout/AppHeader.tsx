@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { useBuilderSyncStatus } from '@/lib/builderSync';
+import { requestSync, useBuilderSyncStatus } from '@/lib/builderSync';
 import { useSessionEmail } from '@/lib/crm/session';
 import { supabase } from '@/lib/supabase';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
@@ -27,6 +27,15 @@ function SyncBadge() {
   const status = useBuilderSyncStatus((s) => s.status);
   const { pathname } = useLocation();
   if (status === 'off' || status === 'synced' || status === 'syncing') return null;
+  if (status === 'offline')
+    return (
+      <span
+        title="No connection. Everything you do is kept on this device and syncs by itself when you're back online."
+        className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800"
+      >
+        <CloudOff className="h-3.5 w-3.5" /> Offline — saving on this device
+      </span>
+    );
   if (status === 'signedOut')
     return (
       <Link
@@ -39,8 +48,8 @@ function SyncBadge() {
     );
   return (
     <button
-      onClick={() => window.location.reload()}
-      title="Changes are saving on this device but not reaching the team cloud. Click to reconnect."
+      onClick={() => void requestSync()}
+      title="Changes are saving on this device but not reaching the team cloud. Click to try again."
       className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
     >
       <CloudOff className="h-3.5 w-3.5" /> Not syncing — reconnect
@@ -92,6 +101,8 @@ function ProfileButton() {
         <DropdownMenuItem
           className="text-red-600"
           onClick={async () => {
+            // send anything still on this device before the session ends
+            await Promise.race([requestSync(), new Promise((r) => setTimeout(r, 5000))]);
             await supabase!.auth.signOut();
             window.location.assign('/');
           }}

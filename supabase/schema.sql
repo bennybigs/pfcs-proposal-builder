@@ -816,3 +816,17 @@ revoke all on function public.proposal_number_taken(text) from public, anon;
 grant execute on function public.claim_proposal_number(text) to authenticated;
 grant execute on function public.set_next_proposal_number(int) to authenticated;
 grant execute on function public.peek_next_proposal_number() to authenticated;
+
+-- ── realtime for the builder ───────────────────────────────────────────
+-- Teammates' proposal and library changes reach open devices instantly
+-- (RLS still applies to what each person receives). Before this, changes
+-- only arrived when the app was reopened.
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'proposals') then
+    alter publication supabase_realtime add table public.proposals;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'builder_shared') then
+    alter publication supabase_realtime add table public.builder_shared;
+  end if;
+end $$;

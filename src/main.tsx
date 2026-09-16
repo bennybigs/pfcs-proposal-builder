@@ -37,3 +37,20 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Development only: lets automated multi-device sync tests reach the stores.
+// Stripped from production builds (import.meta.env.DEV is false there).
+if (import.meta.env.DEV) {
+  void Promise.all([
+    import('./store/useProposalStore'),
+    import('./store/useLibraryStore'),
+    import('./lib/builderSync'),
+  ]).then(([p, l, s]) => {
+    (window as unknown as Record<string, unknown>).__pfcs = {
+      proposals: p.useProposalStore,
+      library: l.useLibraryStore,
+      sync: s.requestSync,
+      status: s.useBuilderSyncStatus,
+    };
+  });
+}

@@ -43,7 +43,7 @@ export function familyLabel(p: Proposal): string {
 }
 
 // unsaved revisions/options don't exist yet as far as numbering is concerned
-const alive = (p: Proposal) => !p.deletedAt && !p.pendingVersion;
+const alive = (p: Proposal) => !p.deletedAt && !p.pendingVersion && !p.conflictOf;
 
 /** Every proposal sharing this one's base number (including itself). */
 export function familyOf(all: Proposal[], p: Proposal): Proposal[] {

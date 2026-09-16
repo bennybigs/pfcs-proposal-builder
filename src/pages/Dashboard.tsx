@@ -28,6 +28,7 @@ import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
 import { createVersion, discardVersion, versionName } from '@/lib/crm/integration/versions';
 import { familyLabel } from '@/lib/proposalFamily';
+import { ConflictBanner } from '@/components/dashboard/ConflictBanner';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -47,8 +48,9 @@ export default function Dashboard() {
   // unsaved revisions/options aren't proposals yet — they surface below as
   // "not saved" with Resume / Discard, never in the lists
   const unsaved = Object.values(proposals).filter((p) => p.pendingVersion && !p.deletedAt);
+  const conflicts = Object.values(proposals).filter((p) => p.conflictOf);
   const all = Object.values(proposals)
-    .filter((p) => !p.deletedAt && !p.pendingVersion)
+    .filter((p) => !p.deletedAt && !p.pendingVersion && !p.conflictOf)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   // a revised proposal is represented by its newest version; the versions it
   // replaced are one tap away ("Show replaced versions"), never lost
@@ -187,6 +189,10 @@ export default function Dashboard() {
 
       <main className="mx-auto max-w-[1800px] px-4 py-8">
         <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">Proposals</h1>
+
+        {conflicts.map((c) => (
+          <ConflictBanner key={c.id} copy={c} />
+        ))}
 
         {unsaved.map((u) => {
           const src = u.pendingVersion ? proposals[u.pendingVersion.sourceId] : undefined;

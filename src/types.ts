@@ -50,6 +50,12 @@ export interface Proposal {
    * until Save. Discard removes it without a trace.
    */
   pendingVersion?: { kind: 'revision' | 'option'; sourceId: string };
+  /**
+   * This device's offline edits to a proposal that a teammate also changed
+   * in the meantime. The team's version stays; this copy waits on this
+   * device (never synced) until the user keeps theirs or discards it.
+   */
+  conflictOf?: { id: string; theirsBy: string; at: string };
   /** Set on the older version when a revision replaces it (the newer id). */
   supersededBy?: string;
   /** Another option of the same quote was accepted/signed. */

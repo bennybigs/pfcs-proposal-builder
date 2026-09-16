@@ -38,7 +38,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (data.session) {
         const { error } = await supabase!.auth.getUser();
-        if (error) {
+        // only a real rejection (401/403…) means the session is dead — no
+        // signal is not a reason to sign anyone out
+        const rejected = error && typeof error.status === 'number' && error.status >= 400 && error.status < 500;
+        if (rejected) {
           await supabase!.auth.signOut();
           setSession(null);
           return;

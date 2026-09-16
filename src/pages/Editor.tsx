@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { familyLabel, familyOf, latestOf, lockReason } from '@/lib/proposalFamily';
 import { createVersion, discardVersion, saveVersion, versionName } from '@/lib/crm/integration/versions';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
+import { ConflictBanner } from '@/components/dashboard/ConflictBanner';
 import { formatDateUS } from '@/lib/format';
 
 type MobileTab = 'library' | 'proposal' | 'editor';
@@ -404,6 +405,13 @@ export default function Editor() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
+              )}
+              {proposal.conflictOf && (
+                <ConflictBanner
+                  copy={proposal}
+                  showOpen={false}
+                  onResolved={(keptId) => navigate(`/proposal/${keptId}`, { replace: true })}
+                />
               )}
               {pending && (
                 <div className="sticky top-0 z-20 rounded-lg border-2 border-brand-orange bg-white p-4 shadow-md">
