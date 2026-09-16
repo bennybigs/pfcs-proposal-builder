@@ -68,6 +68,7 @@ export function TopBar({
   onRevise,
   onAddOption,
   onCopyForCustomer,
+  guardLeave,
   crmControl,
 }: {
   proposal: Proposal;
@@ -85,6 +86,8 @@ export function TopBar({
   onRevise: () => void;
   onAddOption: () => void;
   onCopyForCustomer: () => void;
+  /** Unsaved revision/option: asks Save or Discard before leaving. */
+  guardLeave?: (go: () => void) => void;
   crmControl?: React.ReactNode;
 }) {
   const updateProposal = useProposalStore((s) => s.updateProposal);
@@ -96,13 +99,23 @@ export function TopBar({
   const location = useLocation();
   // where "Done" returns to: the CRM card that launched this proposal, else home
   const from = (location.state as { from?: string } | null)?.from;
-  const done = () => navigate(from ?? '/');
+  const leave = (to: string) => (guardLeave ? guardLeave(() => navigate(to)) : navigate(to));
+  const done = () => leave(from ?? '/');
+  const unsaved = Boolean(proposal.pendingVersion);
   const label = familyLabel(proposal);
 
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
       <div className="flex h-16 items-center gap-2 px-3 sm:h-20 sm:gap-3 sm:px-4">
-        <Link to="/" className="hidden shrink-0 sm:block" title="Back to dashboard">
+        <Link
+          to="/"
+          className="hidden shrink-0 sm:block"
+          title="Back to dashboard"
+          onClick={(e) => {
+            e.preventDefault();
+            leave('/');
+          }}
+        >
           <img
             src={logoUrl}
             alt="PFCS"
@@ -145,7 +158,9 @@ export function TopBar({
             placeholder="Untitled Project"
           />
           <span className="hidden items-center gap-1 whitespace-nowrap text-xs text-brand-steel md:flex">
-            {saveStatus === 'saving' ? (
+            {unsaved ? (
+              <span className="font-semibold text-brand-orange">Not saved yet</span>
+            ) : saveStatus === 'saving' ? (
               <>
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
               </>
@@ -221,10 +236,14 @@ export function TopBar({
               <DropdownMenuItem onClick={onShare}><Link2 /> Copy share link</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportPdf} disabled={pdfBusy}><FileDown /> Download PDF</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onRevise}><Copy /> Revise (keeps this version as sent)</DropdownMenuItem>
-              <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Add option</DropdownMenuItem>
-              <DropdownMenuItem onClick={onCopyForCustomer}><UserPlus /> Copy for another customer</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {!unsaved && (
+                <>
+                  <DropdownMenuItem onClick={onRevise}><Copy /> Revise (keeps this version as sent)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Add option</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onCopyForCustomer}><UserPlus /> Copy for another customer</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={onExportEstimateCsv}><FileSpreadsheet /> QuickBooks Estimate CSV</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportCustomerCsv}><Users /> QuickBooks Customer CSV</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportJson}><FileJson /> Proposal JSON (backup)</DropdownMenuItem>

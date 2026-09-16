@@ -82,7 +82,8 @@ export function useBuilderCloudSync(): void {
       }
       const local = useProposalStore.getState().proposals;
       const dirty = Object.values(local).filter(
-        (p) => lastPushed.get(p.id) !== (p.updatedAt ?? '')
+        // unsaved revisions/options stay on this device until Save
+        (p) => !p.pendingVersion && lastPushed.get(p.id) !== (p.updatedAt ?? '')
       );
       for (const p of dirty) {
         // created_by is never sent — the DB trigger stamps it on first

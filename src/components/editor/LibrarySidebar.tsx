@@ -92,6 +92,7 @@ export function LibrarySidebar({
         (p) =>
           p.id !== proposal.id &&
           !p.deletedAt &&
+          !p.pendingVersion &&
           p.cards.length > 0 &&
           (proposal.crm
             ? p.crm?.contactId === proposal.crm.contactId

@@ -44,7 +44,7 @@ import { lastName } from '@/lib/format';
 import { uuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 import { familyLabel, familyOf, latestOf, lockReason } from '@/lib/proposalFamily';
-import { createVersion } from '@/lib/crm/integration/versions';
+import { createVersion, discardVersion, saveVersion, versionName } from '@/lib/crm/integration/versions';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { formatDateUS } from '@/lib/format';
 
@@ -75,6 +75,8 @@ export default function Editor() {
   const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  // leaving an unsaved revision/option: where we were headed
+  const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
   // "Edit this version anyway" — per visit, never remembered
   const [unlockedId, setUnlockedId] = useState<string | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -129,6 +131,15 @@ export default function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportCardId]);
 
+  // closing the tab with an unsaved revision/option: the browser asks
+  const hasPending = Boolean(proposal?.pendingVersion);
+  useEffect(() => {
+    if (!hasPending) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasPending]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -165,6 +176,27 @@ export default function Editor() {
   const openVersion = (kind: 'revision' | 'option') => {
     const copy = createVersion(proposal.id, kind);
     if (copy) navigate(`/proposal/${copy.id}`, { state: location.state });
+  };
+
+  // ── unsaved revision / option ──
+  const pending = proposal.pendingVersion;
+  const pendingSource = pending ? allProposals[pending.sourceId] : undefined;
+  const doSave = () => saveVersion(proposal.id);
+  const doDiscard = (then?: () => void) => {
+    const id = proposal.id;
+    const sourceId = pending?.sourceId;
+    toast.success(`${versionName(proposal)} discarded`, 'Nothing was changed.');
+    // leave first, then drop it — so this page never flashes "not found"
+    if (then) then();
+    else if (sourceId && allProposals[sourceId]) navigate(`/proposal/${sourceId}`, { state: location.state, replace: true });
+    else navigate('/', { replace: true });
+    window.setTimeout(() => discardVersion(id), 0);
+  };
+  const guardLeave = (go: () => void) => (pending ? setLeaveTo(() => go) : go());
+  // sending or exporting an unsaved version saves it first — the customer
+  // can only ever receive a saved proposal
+  const ensureSaved = () => {
+    if (pending) doSave();
   };
 
   const handleAddTemplate = (template: CardTemplate, index?: number) => {
@@ -205,6 +237,7 @@ export default function Editor() {
   };
 
   const handleShare = async () => {
+    ensureSaved();
     const url = buildShareUrl(proposal, settings);
     try {
       await navigator.clipboard.writeText(url);
@@ -219,6 +252,7 @@ export default function Editor() {
   };
 
   const handleExportPdf = async () => {
+    ensureSaved();
     if (!pdfContainerRef.current) return;
     setPdfBusy(true);
     try {
@@ -278,11 +312,16 @@ export default function Editor() {
           downloadTextFile(`${proposal.proposalNumber}-customer.csv`, generateCustomerCsv(proposal))
         }
         onExportJson={handleExportJson}
-        onSend={() => setSendOpen(true)}
+        onSend={() => {
+          ensureSaved();
+          setSendOpen(true);
+        }}
+        guardLeave={guardLeave}
         onRevise={() => openVersion('revision')}
         onAddOption={() => openVersion('option')}
         onCopyForCustomer={() => setCopyOpen(true)}
         onDelete={() => {
+          if (pending) return doDiscard();
           deleteProposal(proposal.id);
           navigate('/');
         }}
@@ -364,6 +403,28 @@ export default function Editor() {
                   >
                     <X className="h-4 w-4" />
                   </button>
+                </div>
+              )}
+              {pending && (
+                <div className="sticky top-0 z-20 rounded-lg border-2 border-brand-orange bg-white p-4 shadow-md">
+                  <div className="font-heading text-base font-bold uppercase tracking-wide text-brand-black">
+                    {pending.kind === 'revision' ? 'Revising' : 'New option for'}{' '}
+                    {pendingSource?.proposalNumber ?? 'this proposal'} — {versionName(proposal)} isn&apos;t saved
+                  </div>
+                  <p className="mt-0.5 text-sm text-brand-steel">
+                    Make your changes, then save or discard.{' '}
+                    {pending.kind === 'revision'
+                      ? `Nothing happens to ${pendingSource?.proposalNumber ?? 'the original'} or the deal until you save.`
+                      : 'Nothing is added to the deal until you save.'}
+                  </p>
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => doDiscard()}>
+                      <X className="h-3.5 w-3.5" /> Discard
+                    </Button>
+                    <Button size="sm" onClick={doSave}>
+                      <Check className="h-3.5 w-3.5" /> Save {versionName(proposal)}
+                    </Button>
+                  </div>
                 </div>
               )}
               {reason && (
@@ -514,6 +575,43 @@ export default function Editor() {
           </aside>
         </div>
       </DndContext>
+
+      {/* leaving with an unsaved revision/option */}
+      <Dialog open={!!leaveTo} onOpenChange={(o) => !o && setLeaveTo(null)}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Save {versionName(proposal)}?</DialogTitle>
+          <p className="text-sm text-brand-steel">
+            You&apos;re {pending?.kind === 'option' ? 'adding an option to' : 'revising'}{' '}
+            {pendingSource?.proposalNumber ?? 'a proposal'} and haven&apos;t saved it. Discard and
+            nothing changes.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => setLeaveTo(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const go = leaveTo;
+                setLeaveTo(null);
+                doDiscard(go ?? undefined);
+              }}
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={() => {
+                const go = leaveTo;
+                setLeaveTo(null);
+                doSave();
+                go?.();
+              }}
+            >
+              Save {versionName(proposal)}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <TemplatePickerDialog open={copyOpen} onOpenChange={setCopyOpen} copyFrom={proposal} />
 

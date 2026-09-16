@@ -46,6 +46,10 @@ interface ProposalsState {
   reviseProposal: (id: string) => Proposal | undefined;
   /** Another option of the same quote, open side by side with the original. */
   addOption: (id: string) => Proposal | undefined;
+  /** Save an unsaved revision/option: numbers it and applies it to its source. */
+  saveVersion: (id: string) => Proposal | undefined;
+  /** Throw away an unsaved revision/option. */
+  discardVersion: (id: string) => void;
   importProposal: (proposal: Proposal) => Proposal;
 
   addCard: (proposalId: string, card: Card, index?: number) => void;
@@ -62,8 +66,17 @@ function touch(proposal: Proposal): Proposal {
 /** Deep copy as a brand-new draft — new ids, lifecycle flags cleared. */
 function cloneAsDraft(source: Proposal, patch: Partial<Proposal>): Proposal {
   const now = new Date().toISOString();
-  const copy: Proposal = {
-    ...(JSON.parse(JSON.stringify(source)) as Proposal),
+  const copy = JSON.parse(JSON.stringify(source)) as Proposal;
+  // lifecycle flags belong to the source, not the copy
+  delete copy.archivedAt;
+  delete copy.deletedAt;
+  delete copy.deletedBy;
+  delete copy.supersededBy;
+  delete copy.notChosen;
+  delete copy.numberPending; // a version shares its family's number
+  delete copy.pendingVersion;
+  return {
+    ...copy,
     id: uuid(),
     status: 'draft',
     createdAt: now,
@@ -71,13 +84,6 @@ function cloneAsDraft(source: Proposal, patch: Partial<Proposal>): Proposal {
     cards: source.cards.map((c) => ({ ...c, id: uuid() })),
     ...patch,
   };
-  delete copy.archivedAt;
-  delete copy.deletedAt;
-  delete copy.deletedBy;
-  delete copy.supersededBy;
-  delete copy.notChosen;
-  delete copy.numberPending; // a version shares its family's number
-  return copy;
 }
 
 export const useProposalStore = create<ProposalsState>()(
@@ -200,17 +206,13 @@ export const useProposalStore = create<ProposalsState>()(
           const source = latestOf(all, all[id]); // always revise the newest
           const l = lineageOf(source);
           const lineage = { ...l, rev: nextRev(Object.values(all), source), from: source.id };
+          // an unsaved working copy — the original is untouched until Save
           const copy = cloneAsDraft(source, {
             lineage,
             proposalNumber: buildNumber(lineage),
+            pendingVersion: { kind: 'revision', sourceId: source.id },
           });
-          set((s) => ({
-            proposals: {
-              ...s.proposals,
-              [copy.id]: copy,
-              [source.id]: touch({ ...source, supersededBy: copy.id }),
-            },
-          }));
+          set((s) => ({ proposals: { ...s.proposals, [copy.id]: copy } }));
           return copy;
         },
 
@@ -228,13 +230,44 @@ export const useProposalStore = create<ProposalsState>()(
           const copy = cloneAsDraft(source, {
             lineage,
             proposalNumber: buildNumber(lineage),
+            pendingVersion: { kind: 'option', sourceId: source.id },
           });
-          const next = { ...all, [copy.id]: copy };
+          set((s) => ({ proposals: { ...s.proposals, [copy.id]: copy } }));
+          return copy;
+        },
+
+        saveVersion: (id) => {
+          const all = get().proposals;
+          const draft = all[id];
+          if (!draft?.pendingVersion) return draft;
+          const { kind, sourceId } = draft.pendingVersion;
+          const source = all[sourceId];
+          const saved = Object.values(all);
+          const l = lineageOf(draft);
+          // numbers are settled at save, against what actually exists now
+          const lineage =
+            kind === 'revision' && source
+              ? { ...l, rev: nextRev(saved, source) }
+              : source
+                ? { ...l, option: nextOption(saved, source) }
+                : l;
+          const next: Record<string, Proposal> = {
+            ...all,
+            [id]: touch({
+              ...draft,
+              lineage: { ...draft.lineage, ...lineage },
+              proposalNumber: buildNumber(lineage),
+              pendingVersion: undefined,
+            }),
+          };
+          if (source && kind === 'revision') {
+            next[source.id] = touch({ ...source, supersededBy: id });
+          }
           // the first alternate makes the original "Option 1" — renumbered
           // only while it's a draft, so a sent number never changes under
           // the customer
-          if (!l.option) {
-            for (const q of familyOf(Object.values(all), source)) {
+          if (source && kind === 'option' && !lineageOf(source).option) {
+            for (const q of familyOf(saved, source)) {
               const ql = lineageOf(q);
               if (ql.option) continue;
               const lin = { baseNumber: ql.baseNumber, option: 1, rev: ql.rev, from: q.lineage?.from };
@@ -246,7 +279,18 @@ export const useProposalStore = create<ProposalsState>()(
             }
           }
           set({ proposals: next });
-          return copy;
+          return next[id];
+        },
+
+        // never synced, so dropping the record outright is safe
+        discardVersion: (id) => {
+          const p = get().proposals[id];
+          if (!p?.pendingVersion) return;
+          set((s) => {
+            const next = { ...s.proposals };
+            delete next[id];
+            return { proposals: next };
+          });
         },
 
         importProposal: (proposal) => {

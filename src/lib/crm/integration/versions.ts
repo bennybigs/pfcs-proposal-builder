@@ -70,31 +70,49 @@ async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind)
 }
 
 /**
- * Make the new version and wire it into the CRM. Returns the new proposal so
- * the caller can open it; CRM bookkeeping runs after and never blocks.
+ * Revise / Add option: opens an UNSAVED working copy. Nothing else changes —
+ * not the original, not the CRM — until saveVersion(); discardVersion()
+ * throws it away.
  */
-export function createVersion(
-  id: string,
-  kind: VersionKind,
-  onSynced?: () => void
-): Proposal | undefined {
+export function createVersion(id: string, kind: VersionKind): Proposal | undefined {
   const store = useProposalStore.getState();
-  const copy = kind === 'revision' ? store.reviseProposal(id) : store.addOption(id);
-  if (!copy) return undefined;
-  const sourceId = copy.lineage?.from ?? id;
+  return kind === 'revision' ? store.reviseProposal(id) : store.addOption(id);
+}
+
+/** What the save bar calls it: "Rev B", "Option 2", "Option 2 · Rev B". */
+export function versionName(p: Proposal): string {
+  return familyLabel(p) || p.proposalNumber;
+}
+
+/**
+ * Save makes it real: numbered, applied to the original (a revision marks it
+ * replaced; an option makes it Option 1), attached to the deal, logged.
+ */
+export function saveVersion(id: string, onSynced?: () => void): Proposal | undefined {
+  const store = useProposalStore.getState();
+  const pending = store.proposals[id]?.pendingVersion;
+  const saved = store.saveVersion(id);
+  if (!saved || !pending) return saved;
   toast.success(
-    `${familyLabel(copy)} created`,
-    kind === 'revision'
+    `${versionName(saved)} saved`,
+    pending.kind === 'revision'
       ? 'The version you sent is kept exactly as the customer saw it.'
       : 'Both options stay open until the customer signs one.'
   );
-  void attachToDeal(sourceId, copy, kind)
+  void attachToDeal(pending.sourceId, saved, pending.kind)
     .then(() => onSynced?.())
     .catch((err) =>
       toast.error(
-        'Created, but not attached to the deal yet',
+        'Saved, but not attached to the deal yet',
         err instanceof Error ? err.message : String(err)
       )
     );
-  return copy;
+  return saved;
+}
+
+export function discardVersion(id: string): string | undefined {
+  const store = useProposalStore.getState();
+  const sourceId = store.proposals[id]?.pendingVersion?.sourceId;
+  store.discardVersion(id);
+  return sourceId;
 }

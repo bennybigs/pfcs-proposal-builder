@@ -26,7 +26,7 @@ import { STATUS_META } from '@/constants/defaults';
 import { toast } from '@/components/ui/toast';
 import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
-import { createVersion } from '@/lib/crm/integration/versions';
+import { createVersion, discardVersion, versionName } from '@/lib/crm/integration/versions';
 import { familyLabel } from '@/lib/proposalFamily';
 
 export default function Dashboard() {
@@ -44,8 +44,11 @@ export default function Dashboard() {
 
   // deleted proposals live on as tombstones so the deletion can sync — they
   // are never shown anywhere
+  // unsaved revisions/options aren't proposals yet — they surface below as
+  // "not saved" with Resume / Discard, never in the lists
+  const unsaved = Object.values(proposals).filter((p) => p.pendingVersion && !p.deletedAt);
   const all = Object.values(proposals)
-    .filter((p) => !p.deletedAt)
+    .filter((p) => !p.deletedAt && !p.pendingVersion)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   // a revised proposal is represented by its newest version; the versions it
   // replaced are one tap away ("Show replaced versions"), never lost
@@ -184,6 +187,29 @@ export default function Dashboard() {
 
       <main className="mx-auto max-w-[1800px] px-4 py-8">
         <h1 className="mb-6 font-heading text-3xl font-bold uppercase tracking-wide">Proposals</h1>
+
+        {unsaved.map((u) => {
+          const src = u.pendingVersion ? proposals[u.pendingVersion.sourceId] : undefined;
+          return (
+            <div
+              key={u.id}
+              className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border-2 border-brand-orange bg-brand-orange/5 p-3 text-sm"
+            >
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-orange" />
+              <span className="min-w-0 flex-1">
+                <strong>{versionName(u)} isn&apos;t saved</strong> —{' '}
+                {u.pendingVersion?.kind === 'option' ? 'a new option for' : 'a revision of'}{' '}
+                {src?.proposalNumber ?? 'a proposal'} ({u.project.referenceName || u.customer.fullName})
+              </span>
+              <Button size="sm" variant="outline" onClick={() => { discardVersion(u.id); toast.success(`${versionName(u)} discarded`, 'Nothing was changed.'); }}>
+                Discard
+              </Button>
+              <Button size="sm" onClick={() => navigate(`/proposal/${u.id}`)}>
+                Resume
+              </Button>
+            </div>
+          );
+        })}
 
         {list.length === 0 && contracts.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-brand-gray-light bg-white p-16 text-center">

@@ -572,9 +572,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 const closed = Boolean(local?.supersededBy || local?.notChosen);
                 const sent = local ? lockReason(local) === 'sent' : false;
                 const openVersion = (kind: 'revision' | 'option') => {
-                  const copy = createVersion(pl.proposal_id, kind, () =>
-                    qc.invalidateQueries({ queryKey: ['proposal_links'] })
-                  );
+                  // opens an unsaved copy — the deal only changes when it's saved
+                  const copy = createVersion(pl.proposal_id, kind);
                   if (copy)
                     navigate(`/proposal/${copy.id}`, {
                       state: { from: location.pathname + location.search },

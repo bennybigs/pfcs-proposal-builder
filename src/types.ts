@@ -44,6 +44,12 @@ export interface Proposal {
    * counter confirms it on the next sync. Only drafts are ever renumbered.
    */
   numberPending?: boolean;
+  /**
+   * A revision/option that hasn't been saved yet: it lives only on this
+   * device, never syncs, and changes nothing about the proposal it came from
+   * until Save. Discard removes it without a trace.
+   */
+  pendingVersion?: { kind: 'revision' | 'option'; sourceId: string };
   /** Set on the older version when a revision replaces it (the newer id). */
   supersededBy?: string;
   /** Another option of the same quote was accepted/signed. */
