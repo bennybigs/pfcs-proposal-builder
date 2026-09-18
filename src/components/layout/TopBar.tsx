@@ -15,12 +15,15 @@ import {
   Link2,
   Loader2,
   MoreHorizontal,
+  Save,
   Send,
   Trash2,
   UserPlus,
   Users,
 } from 'lucide-react';
 import type { Proposal } from '@/types';
+import { flushToDisk } from '@/store/persistence';
+import { requestSync } from '@/lib/builderSync';
 import { cn } from '@/lib/utils';
 import { familyLabel } from '@/lib/proposalFamily';
 import { Button } from '@/components/ui/button';
@@ -99,6 +102,15 @@ export function TopBar({
   const location = useLocation();
   // where "Done" returns to: the CRM card that launched this proposal, else home
   const from = (location.state as { from?: string } | null)?.from;
+  const [justSaved, setJustSaved] = useState(false);
+  // Everything is saved as you type; this button is the proof — it writes to
+  // the device, pushes to the team cloud and says so.
+  const saveNow = async () => {
+    flushToDisk();
+    setJustSaved(true);
+    window.setTimeout(() => setJustSaved(false), 2500);
+    await requestSync();
+  };
   const leave = (to: string) => (guardLeave ? guardLeave(() => navigate(to)) : navigate(to));
   const done = () => leave(from ?? '/');
   const unsaved = Boolean(proposal.pendingVersion);
@@ -221,6 +233,22 @@ export function TopBar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void saveNow()}
+            title="Everything is saved as you type — this saves and syncs right now"
+          >
+            {justSaved ? (
+              <>
+                <Check className="h-4 w-4 text-green-600" /> Saved
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" /> Save
+              </>
+            )}
+          </Button>
           <Button size="sm" onClick={onSend}>
             <Send className="h-4 w-4" /> <span className="hidden sm:inline">Send…</span>
           </Button>

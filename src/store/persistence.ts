@@ -10,6 +10,11 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
 const timers = new Map<string, number>();
 const pending = new Map<string, string>();
 
+/** Write every pending change to this device now (the Save button). */
+export function flushToDisk() {
+  flushAll();
+}
+
 function flushAll() {
   for (const [key, value] of pending) {
     try {

@@ -1,10 +1,9 @@
-// Opening an existing proposal lands here first: every version of this quote
-// in one list, each with its own dates, and the three things you can do —
-// Open it, Revise it (replaces what was sent), or Duplicate it (an
-// alternative alongside, with a name you give it).
-import { useState } from 'react';
+// Opening a proposal shows it the way the customer sees it, with every
+// version of that quote listed down the left — each titled and stamped — and
+// the things you can do along the top: Edit, Revise, Duplicate, Send.
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, FileText, Pencil, Plus } from 'lucide-react';
+import { ArrowLeft, Copy, Pencil, Plus, Send } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,9 +17,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { SendProposalDialog } from '@/components/editor/SendProposalDialog';
 import { useProposalStore } from '@/store/useProposalStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
 import { createVersion } from '@/lib/crm/integration/versions';
-import { familyLabel, familyOf, lineageOf } from '@/lib/proposalFamily';
+import { logProposalEvent } from '@/lib/crm/integration/proposalEvents';
+import { familyLabel, familyOf, lineageOf, versionLetter } from '@/lib/proposalFamily';
+import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
 import { grandTotal } from '@/lib/pricing';
 import { formatCurrency, formatDateUS } from '@/lib/format';
 import { STATUS_META } from '@/constants/defaults';
@@ -34,15 +38,29 @@ const stamp = (iso?: string) => {
   return `${formatDateUS(iso)} · ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 };
 
+function stateOf(p: Proposal) {
+  if (p.archivedAt) return 'Archived';
+  if (p.supersededBy) return 'Replaced';
+  if (p.notChosen) return 'Not chosen';
+  return (STATUS_META[p.status] ?? STATUS_META.draft).label;
+}
+
 export default function Versions() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const proposals = useProposalStore((s) => s.proposals);
-  const current = id ? proposals[id] : undefined;
+  const settings = useLibraryStore((s) => s.settings);
+  const opened = id ? proposals[id] : undefined;
+  const [showId, setShowId] = useState<string | undefined>(id);
   const [duplicating, setDuplicating] = useState<Proposal | null>(null);
   const [name, setName] = useState('');
+  const [sendOpen, setSendOpen] = useState(false);
 
-  if (!current) {
+  useEffect(() => setShowId(id), [id]);
+
+  const shown = (showId && proposals[showId]) || opened;
+
+  if (!opened || !shown) {
     return (
       <div className="min-h-screen">
         <AppHeader />
@@ -58,10 +76,12 @@ export default function Versions() {
     );
   }
 
-  const versions = familyOf(Object.values(proposals), current);
-  const open = (p: Proposal) => navigate(`/proposal/${p.id}`);
-  const revise = (p: Proposal) => {
-    const copy = createVersion(p.id, 'revision');
+  const versions = familyOf(Object.values(proposals), opened);
+  const closed = Boolean(shown.supersededBy || shown.notChosen);
+  const nextLetter = versionLetter(versions.length);
+
+  const revise = () => {
+    const copy = createVersion(shown.id, 'revision');
     if (copy) navigate(`/proposal/${copy.id}`);
   };
   const duplicate = () => {
@@ -74,103 +94,128 @@ export default function Versions() {
   return (
     <div className="min-h-screen">
       <AppHeader />
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">
-            <ArrowLeft className="h-4 w-4" /> All proposals
-          </Link>
-        </Button>
-        <h1 className="mt-4 font-heading text-3xl font-bold uppercase tracking-wide">
-          {current.project.referenceName || 'Untitled Project'}
-        </h1>
-        <p className="text-brand-steel">
-          {current.customer.fullName} · {lineageOf(current).baseNumber}
-        </p>
-        <p className="mt-4 text-sm text-brand-steel">
-          {versions.length === 1
-            ? 'One version so far. Revise it to replace what you sent, or duplicate it to offer an alternative.'
-            : `${versions.length} versions. Every one is kept — pick the one you want to work on.`}
-        </p>
 
-        <div className="mt-4 grid gap-3">
-          {versions.map((p) => {
-            const status = STATUS_META[p.status] ?? STATUS_META.draft;
-            const replaced = Boolean(p.supersededBy);
-            const closed = replaced || Boolean(p.notChosen);
-            return (
-              <div
-                key={p.id}
-                className={cn(
-                  'rounded-lg border-l-4 bg-white p-4 shadow-sm',
-                  closed ? 'border-brand-gray-light opacity-75' : 'border-brand-orange'
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <FileText className="h-4 w-4 shrink-0 text-brand-steel" />
-                  <span className="font-heading text-lg font-bold uppercase tracking-wide">
-                    {familyLabel(p)}
-                  </span>
-                  {p.versionName && (
-                    <span className="text-sm font-medium text-brand-black">— {p.versionName}</span>
-                  )}
-                  <Badge className={status.className} variant="secondary">
-                    {p.archivedAt
-                      ? 'Archived'
-                      : replaced
-                        ? 'Replaced'
-                        : p.notChosen
-                          ? 'Not chosen'
-                          : status.label}
-                  </Badge>
-                  <span className="ml-auto font-heading text-lg font-bold text-brand-orange">
-                    {formatCurrency(grandTotal(p))}
-                  </span>
-                </div>
-
-                <div className="mt-1.5 grid gap-0.5 text-xs text-brand-steel sm:grid-cols-3">
-                  <span>Created {stamp(p.createdAt)}</span>
-                  <span>Last edited {stamp(p.updatedAt)}</span>
-                  <span>{p.sentAt ? `Sent ${stamp(p.sentAt)}` : 'Not sent yet'}</span>
-                </div>
-                <div className="mt-1 text-xs text-brand-steel">
-                  {p.proposalNumber}
-                  {replaced && ' · replaced by a newer version'}
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => open(p)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                    {p.status === 'draft' && !closed ? 'Open & edit' : 'Open'}
-                  </Button>
-                  {!closed && (
-                    <Button size="sm" variant="outline" onClick={() => revise(p)}>
-                      <Plus className="h-3.5 w-3.5" /> Revise → Version{' '}
-                      {String.fromCharCode(65 + versions.length)}
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setDuplicating(p);
-                      setName('');
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" /> Duplicate
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+      {/* what you can do with the version you're looking at */}
+      <div className="sticky top-16 z-30 border-b bg-white shadow-sm sm:top-20">
+        <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2 px-4 py-2">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/">
+              <ArrowLeft className="h-4 w-4" /> All proposals
+            </Link>
+          </Button>
+          <div className="mx-1 min-w-0 flex-1">
+            <div className="truncate font-heading text-base font-bold uppercase tracking-wide">
+              {opened.project.referenceName || 'Untitled Project'}
+            </div>
+            <div className="truncate text-xs text-brand-steel">
+              {familyLabel(shown)}
+              {shown.versionName ? ` — ${shown.versionName}` : ''} · {shown.proposalNumber} ·{' '}
+              {stateOf(shown)}
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => navigate(`/proposal/${shown.id}`)}>
+            <Pencil className="h-4 w-4" /> {closed || shown.status !== 'draft' ? 'Open' : 'Edit'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={revise}
+            disabled={closed}
+            title={
+              closed
+                ? `${familyLabel(shown)} is ${stateOf(shown).toLowerCase()} — revise the current version, or duplicate this one to work from it`
+                : 'A new version that replaces this one; this one is kept as sent'
+            }
+          >
+            <Plus className="h-4 w-4" /> Revise → Version {nextLetter}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setDuplicating(shown);
+              setName('');
+            }}
+          >
+            <Copy className="h-4 w-4" /> Duplicate → Version {nextLetter}
+          </Button>
+          <Button size="sm" onClick={() => setSendOpen(true)}>
+            <Send className="h-4 w-4" /> Send…
+          </Button>
         </div>
+      </div>
+
+      <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 lg:flex-row">
+        {/* the versions — titled and stamped */}
+        <aside className="w-full shrink-0 lg:w-[320px]">
+          <h2 className="mb-2 font-heading text-xs font-bold uppercase tracking-wider text-brand-steel">
+            {versions.length} version{versions.length === 1 ? '' : 's'} of{' '}
+            {lineageOf(opened).baseNumber}
+          </h2>
+          <div className="grid gap-2">
+            {versions.map((p) => {
+              const active = p.id === shown.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setShowId(p.id)}
+                  className={cn(
+                    'rounded-lg border-l-4 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md',
+                    active ? 'border-brand-orange ring-1 ring-brand-orange' : 'border-brand-gray-light',
+                    (p.supersededBy || p.notChosen) && 'opacity-70'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading text-sm font-bold uppercase tracking-wide">
+                      {familyLabel(p)}
+                    </span>
+                    <Badge
+                      className={(STATUS_META[p.status] ?? STATUS_META.draft).className}
+                      variant="secondary"
+                    >
+                      {stateOf(p)}
+                    </Badge>
+                    <span className="ml-auto text-sm font-bold text-brand-orange">
+                      {formatCurrency(grandTotal(p))}
+                    </span>
+                  </div>
+                  {p.versionName && (
+                    <div className="mt-0.5 text-sm font-medium text-brand-black">{p.versionName}</div>
+                  )}
+                  <div className="mt-1 grid gap-0.5 text-[11px] text-brand-steel">
+                    <span>Created {stamp(p.createdAt)}</span>
+                    <span>Last edited {stamp(p.updatedAt)}</span>
+                    <span>{p.sentAt ? `Sent ${stamp(p.sentAt)}` : 'Not sent yet'}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* the proposal itself, exactly as the customer sees it */}
+        <section className="min-w-0 flex-1">
+          <div className="light-scope rounded-lg bg-brand-gray-bg p-2 sm:p-4">
+            <CustomerProposal proposal={shown} company={companySnapshot(settings)} />
+          </div>
+        </section>
       </main>
+
+      <SendProposalDialog
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        proposal={shown}
+        settings={settings}
+        buildUrl={() => buildShareUrl(shown, settings)}
+        onMailApp={() => undefined}
+        afterSent={(url) => logProposalEvent(shown, 'share', url)}
+      />
 
       <Dialog open={!!duplicating} onOpenChange={(o) => !o && setDuplicating(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              Duplicate {duplicating ? familyLabel(duplicating) : ''} → Version{' '}
-              {String.fromCharCode(65 + versions.length)}
+              Duplicate {duplicating ? familyLabel(duplicating) : ''} → Version {nextLetter}
             </DialogTitle>
             <DialogDescription>
               A copy to change however you like. Both stay in this list until the customer signs
