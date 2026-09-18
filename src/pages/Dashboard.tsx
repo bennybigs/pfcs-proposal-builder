@@ -65,9 +65,12 @@ export default function Dashboard() {
       {items.map((p) => {
         const status = STATUS_META[p.status] ?? STATUS_META.draft;
         const isContract = p.status === 'contract';
-        const label = familyLabel(p);
-        const earlier = p.lineage?.rev ? all.filter((q) => q.supersededBy && q.lineage?.baseNumber === p.lineage?.baseNumber && (q.lineage?.option ?? 0) === (p.lineage?.option ?? 0)).length : 0;
-        const openVersion = (kind: 'revision' | 'option') => {
+        // the version chip only says something once there is more than one
+        const base = p.lineage?.baseNumber ?? p.proposalNumber;
+        const family = all.filter((q) => (q.lineage?.baseNumber ?? q.proposalNumber) === base);
+        const label = family.length > 1 || p.versionName ? familyLabel(p) : '';
+        const earlier = family.filter((q) => q.supersededBy).length;
+        const openVersion = (kind: 'revision' | 'duplicate') => {
           const copy = createVersion(p.id, kind);
           if (copy) navigate(`/proposal/${copy.id}`);
         };
@@ -80,7 +83,7 @@ export default function Dashboard() {
               (p.archivedAt ? ' opacity-70' : '')
             }
           >
-            <Link to={`/proposal/${p.id}`} className="block">
+            <Link to={`/proposal/${p.id}/versions`} className="block">
               <div className="flex items-start justify-between gap-2 pr-8">
                 <div className="text-xs font-semibold text-brand-steel">{p.proposalNumber}</div>
                 <Badge className={status.className} variant="secondary">
@@ -101,10 +104,11 @@ export default function Dashboard() {
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
                   <span className="rounded-full bg-brand-orange/10 px-2 py-0.5 font-semibold text-brand-orange">
                     {label}
+                    {p.versionName ? ` — ${p.versionName}` : ''}
                   </span>
                   {earlier > 0 && (
                     <span className="flex items-center gap-1 text-brand-steel">
-                      <History className="h-3 w-3" /> replaces {earlier} earlier version{earlier === 1 ? '' : 's'}
+                      <History className="h-3 w-3" /> {family.length} versions
                     </span>
                   )}
                 </div>
@@ -146,8 +150,8 @@ export default function Dashboard() {
                   <DropdownMenuItem onClick={() => openVersion('revision')}>
                     <Copy /> Revise
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => openVersion('option')}>
-                    <GitBranchPlus /> Add option
+                  <DropdownMenuItem onClick={() => navigate(`/proposal/${p.id}/versions`)}>
+                    <GitBranchPlus /> All versions
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setCopyTarget(p)}>
                     <UserPlus /> Copy for another customer
@@ -204,7 +208,7 @@ export default function Dashboard() {
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-orange" />
               <span className="min-w-0 flex-1">
                 <strong>{versionName(u)} isn&apos;t saved</strong> —{' '}
-                {u.pendingVersion?.kind === 'option' ? 'a new option for' : 'a revision of'}{' '}
+                {u.pendingVersion?.kind === 'duplicate' ? 'a duplicate of' : 'a revision of'}{' '}
                 {src?.proposalNumber ?? 'a proposal'} ({u.project.referenceName || u.customer.fullName})
               </span>
               <Button size="sm" variant="outline" onClick={() => { discardVersion(u.id); toast.success(`${versionName(u)} discarded`, 'Nothing was changed.'); }}>

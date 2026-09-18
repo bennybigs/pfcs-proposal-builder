@@ -33,23 +33,35 @@ export interface Proposal {
   crm?: { contactId: string; dealId: string };
 
   /**
-   * Revisions and options of one quote share a base number. Absent on a
-   * proposal that has never been revised or given alternates.
-   *   option — 1, 2, 3… when the customer is choosing between versions
-   *   rev    — 0 original, 1 = Rev B, 2 = Rev C…
+   * Versions of one quote share a base number: Version A, B, C… A revision
+   * replaces the version it came from; a duplicate stands alongside it.
+   * Absent on a proposal that has only ever had one version.
    */
-  lineage?: { baseNumber: string; option?: number; rev?: number; from?: string };
+  lineage?: {
+    baseNumber: string;
+    seq?: number; // 0 = Version A, 1 = Version B …
+    kind?: 'revision' | 'duplicate';
+    from?: string; // the version this one was made from
+    /** @deprecated earlier name for seq */
+    rev?: number;
+    /** @deprecated earlier "Option 2" numbering */
+    option?: number;
+  };
+  /** Name given to a duplicate: "40x72 with lean-to". */
+  versionName?: string;
+  /** When this version first went to the customer. */
+  sentAt?: string;
   /**
    * The number is provisional (made on this device) until the team-wide
    * counter confirms it on the next sync. Only drafts are ever renumbered.
    */
   numberPending?: boolean;
   /**
-   * A revision/option that hasn't been saved yet: it lives only on this
+   * A version that hasn't been saved yet: it lives only on this
    * device, never syncs, and changes nothing about the proposal it came from
    * until Save. Discard removes it without a trace.
    */
-  pendingVersion?: { kind: 'revision' | 'option'; sourceId: string };
+  pendingVersion?: { kind: 'revision' | 'duplicate'; sourceId: string };
   /**
    * This device's offline edits to a proposal that a teammate also changed
    * in the meantime. The team's version stays; this copy waits on this
@@ -58,7 +70,7 @@ export interface Proposal {
   conflictOf?: { id: string; theirsBy: string; at: string };
   /** Set on the older version when a revision replaces it (the newer id). */
   supersededBy?: string;
-  /** Another option of the same quote was accepted/signed. */
+  /** Another version of the same quote was accepted/signed. */
   notChosen?: boolean;
 
   /** Archived: out of the working list, everything kept, restorable. */

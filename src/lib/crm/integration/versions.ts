@@ -1,4 +1,4 @@
-// Revise / Add option — the store makes the document, this keeps the CRM
+// Revise / Duplicate — the store makes the document, this keeps the CRM
 // honest: the new version is attached to the same deal (so it shows under
 // the card), a revision takes over the deal value from the version it
 // replaces, and the timeline says what happened.
@@ -7,12 +7,12 @@
 // talks to supabase directly; callers inside the CRM pass onSynced to refetch.
 import { supabase } from '@/lib/supabase';
 import { grandTotal } from '@/lib/pricing';
-import { familyLabel, linkTitle } from '@/lib/proposalFamily';
+import { linkTitle, versionTitle } from '@/lib/proposalFamily';
 import { useProposalStore } from '@/store/useProposalStore';
 import { toast } from '@/components/ui/toast';
 import type { Proposal } from '@/types';
 
-export type VersionKind = 'revision' | 'option';
+export type VersionKind = 'revision' | 'duplicate';
 
 async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind): Promise<void> {
   if (!copy.crm || !supabase) return;
@@ -63,25 +63,25 @@ async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind)
     type: 'proposal_event',
     body:
       kind === 'revision'
-        ? `${familyLabel(copy)} started — revising ${source?.proposalNumber ?? 'the sent proposal'}, which is kept as sent`
-        : `${familyLabel(copy)} started from ${source?.proposalNumber ?? 'an existing proposal'} — an alternate for the customer to choose from`,
+        ? `${versionTitle(copy)} started — revising ${source?.proposalNumber ?? 'the sent proposal'}, which is kept as sent`
+        : `${versionTitle(copy)} started from ${source?.proposalNumber ?? 'an existing proposal'} — an alternative for the customer to choose from`,
     logged_by: email,
   });
 }
 
 /**
- * Revise / Add option: opens an UNSAVED working copy. Nothing else changes —
+ * Revise / Duplicate: opens an UNSAVED working copy. Nothing else changes —
  * not the original, not the CRM — until saveVersion(); discardVersion()
  * throws it away.
  */
-export function createVersion(id: string, kind: VersionKind): Proposal | undefined {
+export function createVersion(id: string, kind: VersionKind, name?: string): Proposal | undefined {
   const store = useProposalStore.getState();
-  return kind === 'revision' ? store.reviseProposal(id) : store.addOption(id);
+  return kind === 'revision' ? store.reviseProposal(id) : store.duplicateVersion(id, name);
 }
 
-/** What the save bar calls it: "Rev B", "Option 2", "Option 2 · Rev B". */
+/** What the save bar calls it: "Version B", or "Version B — 40x72". */
 export function versionName(p: Proposal): string {
-  return familyLabel(p) || p.proposalNumber;
+  return versionTitle(p);
 }
 
 /**
@@ -97,7 +97,7 @@ export function saveVersion(id: string, onSynced?: () => void): Proposal | undef
     `${versionName(saved)} saved`,
     pending.kind === 'revision'
       ? 'The version you sent is kept exactly as the customer saw it.'
-      : 'Both options stay open until the customer signs one.'
+      : 'Both versions stay in the list until the customer signs one.'
   );
   void attachToDeal(pending.sourceId, saved, pending.kind)
     .then(() => onSynced?.())

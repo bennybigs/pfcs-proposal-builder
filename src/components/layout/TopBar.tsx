@@ -239,7 +239,7 @@ export function TopBar({
               {!unsaved && (
                 <>
                   <DropdownMenuItem onClick={onRevise}><Copy /> Revise (keeps this version as sent)</DropdownMenuItem>
-                  <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Add option</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Duplicate this version</DropdownMenuItem>
                   <DropdownMenuItem onClick={onCopyForCustomer}><UserPlus /> Copy for another customer</DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>

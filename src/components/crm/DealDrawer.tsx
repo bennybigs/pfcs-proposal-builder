@@ -571,7 +571,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 const label = local ? familyLabel(local) : '';
                 const closed = Boolean(local?.supersededBy || local?.notChosen);
                 const sent = local ? lockReason(local) === 'sent' : false;
-                const openVersion = (kind: 'revision' | 'option') => {
+                const openVersion = (kind: 'revision' | 'duplicate') => {
                   // opens an unsaved copy — the deal only changes when it's saved
                   const copy = createVersion(pl.proposal_id, kind);
                   if (copy)
@@ -667,10 +667,10 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          title="Give the customer another version to choose from"
-                          onClick={() => openVersion('option')}
+                          title="A copy alongside this one for the customer to choose from"
+                          onClick={() => openVersion('duplicate')}
                         >
-                          <GitBranchPlus className="mr-1 h-3 w-3" /> Add option
+                          <GitBranchPlus className="mr-1 h-3 w-3" /> Duplicate
                         </Button>
                       )}
                       {pl.share_url && (

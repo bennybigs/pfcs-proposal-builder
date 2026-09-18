@@ -174,7 +174,7 @@ export default function Editor() {
           (q) => !q.supersededBy && (q.status === 'accepted' || q.status === 'contract')
         )
       : undefined;
-  const openVersion = (kind: 'revision' | 'option') => {
+  const openVersion = (kind: 'revision' | 'duplicate') => {
     const copy = createVersion(proposal.id, kind);
     if (copy) navigate(`/proposal/${copy.id}`, { state: location.state });
   };
@@ -319,7 +319,7 @@ export default function Editor() {
         }}
         guardLeave={guardLeave}
         onRevise={() => openVersion('revision')}
-        onAddOption={() => openVersion('option')}
+        onAddOption={() => openVersion('duplicate')}
         onCopyForCustomer={() => setCopyOpen(true)}
         onDelete={() => {
           if (pending) return doDiscard();
@@ -416,14 +416,14 @@ export default function Editor() {
               {pending && (
                 <div className="sticky top-0 z-20 rounded-lg border-2 border-brand-orange bg-white p-4 shadow-md">
                   <div className="font-heading text-base font-bold uppercase tracking-wide text-brand-black">
-                    {pending.kind === 'revision' ? 'Revising' : 'New option for'}{' '}
+                    {pending.kind === 'revision' ? 'Revising' : 'Duplicate of'}{' '}
                     {pendingSource?.proposalNumber ?? 'this proposal'} — {versionName(proposal)} isn&apos;t saved
                   </div>
                   <p className="mt-0.5 text-sm text-brand-steel">
                     Make your changes, then save or discard.{' '}
                     {pending.kind === 'revision'
                       ? `Nothing happens to ${pendingSource?.proposalNumber ?? 'the original'} or the deal until you save.`
-                      : 'Nothing is added to the deal until you save.'}
+                      : 'It joins the version list when you save — not before.'}
                   </p>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => doDiscard()}>
@@ -446,7 +446,7 @@ export default function Editor() {
                   newestId={newest.id}
                   chosenId={chosen?.id}
                   onRevise={() => openVersion('revision')}
-                  onAddOption={() => openVersion('option')}
+                  onAddOption={() => openVersion('duplicate')}
                   onUnlock={() => setUnlockedId(proposal.id)}
                   onLock={() => setUnlockedId(null)}
                 />
@@ -589,7 +589,7 @@ export default function Editor() {
         <DialogContent className="max-w-md">
           <DialogTitle>Save {versionName(proposal)}?</DialogTitle>
           <p className="text-sm text-brand-steel">
-            You&apos;re {pending?.kind === 'option' ? 'adding an option to' : 'revising'}{' '}
+            You&apos;re {pending?.kind === 'duplicate' ? 'duplicating' : 'revising'}{' '}
             {pendingSource?.proposalNumber ?? 'a proposal'} and haven&apos;t saved it. Discard and
             nothing changes.
           </p>
@@ -804,7 +804,7 @@ function VersionBanner({
             {/* once signed there's nothing left to choose between */}
             {proposal.status !== 'contract' && proposal.status !== 'accepted' && (
               <Button size="sm" variant="outline" onClick={onAddOption}>
-                <GitBranchPlus className="h-3.5 w-3.5" /> Add option
+                <GitBranchPlus className="h-3.5 w-3.5" /> Duplicate
               </Button>
             )}
           </>

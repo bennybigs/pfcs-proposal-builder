@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Dashboard from '@/pages/Dashboard';
 import Editor from '@/pages/Editor';
+import Versions from '@/pages/Versions';
 import CustomerView from '@/pages/CustomerView';
 import LibraryEditor from '@/pages/LibraryEditor';
 import Settings from '@/pages/Settings';
@@ -32,6 +33,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<BuilderGate><Dashboard /></BuilderGate>} />
         <Route path="/proposal/:id" element={<BuilderGate><Editor /></BuilderGate>} />
+        <Route path="/proposal/:id/versions" element={<BuilderGate><Versions /></BuilderGate>} />
         {/* customer share links stay open — no account, no gate */}
         <Route path="/view" element={<CustomerView />} />
         {/* public integrator docs — the link we hand the marketing company */}

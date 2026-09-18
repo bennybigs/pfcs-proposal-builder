@@ -1,70 +1,69 @@
-// Revisions and options — pure logic, no React.
+// Versions of one quote — pure logic, no React.
 //
-// One quote = one base number (PFCS-2026-0014). Changing what was sent makes
-// a REVISION (Rev B replaces Rev A, which stays as the record of what the
-// customer saw). Giving them a choice makes an OPTION (Option 1 and Option 2
-// stay open side by side until one is signed). The two combine:
-// "PFCS-2026-0014 Option 2 Rev B".
+// One quote = one base number (PFCS-2026-0014) and a list of versions:
+// Version A, Version B, Version C… in the order they were made. Every
+// version keeps its own dates and stays in the list.
+//
+//   Revise    — the next version replaces what was sent; the old one is kept
+//               exactly as the customer saw it, marked Replaced.
+//   Duplicate — the next version stands alongside as an alternative, with a
+//               name you give it ("40x72 with lean-to"). Both stay open
+//               until the customer signs one.
 import type { Proposal } from '@/types';
 
 export interface Lineage {
   baseNumber: string;
-  option?: number;
-  rev: number;
+  seq: number; // 0 = Version A
+  kind?: 'revision' | 'duplicate';
 }
 
 export function lineageOf(p: Proposal): Lineage {
+  const l = p.lineage;
   return {
-    baseNumber: p.lineage?.baseNumber ?? p.proposalNumber,
-    option: p.lineage?.option,
-    rev: p.lineage?.rev ?? 0,
+    baseNumber: l?.baseNumber ?? p.proposalNumber,
+    // `rev` is the old field name, kept readable for anything made earlier
+    seq: l?.seq ?? l?.rev ?? 0,
+    kind: l?.kind,
   };
 }
 
 /** 0 → "A", 1 → "B" … */
-export const revLetter = (rev: number) => String.fromCharCode(65 + Math.max(0, rev));
+export const versionLetter = (seq: number) => String.fromCharCode(65 + Math.max(0, seq));
 
 export function buildNumber(l: Lineage): string {
-  return [
-    l.baseNumber,
-    l.option ? `Option ${l.option}` : '',
-    l.rev > 0 ? `Rev ${revLetter(l.rev)}` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  return l.seq > 0 ? `${l.baseNumber} Version ${versionLetter(l.seq)}` : l.baseNumber;
 }
 
-/** "Option 2 · Rev B" — empty for a plain one-off proposal. */
+/** "Version B" — every proposal is a version, even when it's the only one. */
 export function familyLabel(p: Proposal): string {
-  const l = lineageOf(p);
-  return [l.option ? `Option ${l.option}` : '', l.rev > 0 ? `Rev ${revLetter(l.rev)}` : '']
-    .filter(Boolean)
-    .join(' · ');
+  return `Version ${versionLetter(lineageOf(p).seq)}`;
 }
 
-// unsaved revisions/options don't exist yet as far as numbering is concerned
+/** "Version B — 40x72 with lean-to" when it was given a name. */
+export function versionTitle(p: Proposal): string {
+  const label = familyLabel(p);
+  return p.versionName?.trim() ? `${label} — ${p.versionName.trim()}` : label;
+}
+
+// unsaved versions and conflict copies don't exist yet as far as the list
+// (and numbering) is concerned
 const alive = (p: Proposal) => !p.deletedAt && !p.pendingVersion && !p.conflictOf;
 
-/** Every proposal sharing this one's base number (including itself). */
+/** Every version of this quote, oldest first. */
 export function familyOf(all: Proposal[], p: Proposal): Proposal[] {
   const base = lineageOf(p).baseNumber;
-  return all.filter((q) => alive(q) && lineageOf(q).baseNumber === base);
+  return all
+    .filter((q) => alive(q) && lineageOf(q).baseNumber === base)
+    .sort((a, b) => lineageOf(a).seq - lineageOf(b).seq);
 }
 
-export function nextRev(all: Proposal[], p: Proposal): number {
-  const l = lineageOf(p);
-  const revs = familyOf(all, p)
-    .filter((q) => (lineageOf(q).option ?? 0) === (l.option ?? 0))
-    .map((q) => lineageOf(q).rev);
-  return Math.max(l.rev, ...revs) + 1;
+/** The letter the next version gets. */
+export function nextSeq(all: Proposal[], p: Proposal): number {
+  const seqs = familyOf(all, p).map((q) => lineageOf(q).seq);
+  return Math.max(lineageOf(p).seq, ...seqs) + 1;
 }
 
-export function nextOption(all: Proposal[], p: Proposal): number {
-  const options = familyOf(all, p).map((q) => lineageOf(q).option ?? 1);
-  return Math.max(1, ...options) + 1;
-}
-
-/** The latest version in a revision chain (follows supersededBy). */
+/** The newest version in a revision chain (follows supersededBy). */
 export function latestOf(byId: Record<string, Proposal>, p: Proposal): Proposal {
   let cur = p;
   const seen = new Set<string>();
@@ -78,8 +77,8 @@ export function latestOf(byId: Record<string, Proposal>, p: Proposal): Proposal 
 export type LockReason = 'sent' | 'superseded' | 'not-chosen' | null;
 
 /**
- * Why this proposal shouldn't be edited in place. Drafts edit freely; once
- * it has gone to the customer, changes belong in a revision so the record of
+ * Why this version shouldn't be edited in place. Drafts edit freely; once it
+ * has gone to the customer, changes belong in a new version so the record of
  * what they were quoted stays intact.
  */
 export function lockReason(p: Proposal): LockReason {
@@ -89,9 +88,9 @@ export function lockReason(p: Proposal): LockReason {
   return null;
 }
 
-/** Link title the CRM shows: "Yoder Barndominium — Option 2 · Rev B". */
+/** Link title the CRM shows: "Yoder Barndominium — Version B — 40x72". */
 export function linkTitle(p: Proposal): string {
   const name = p.project.referenceName || p.customer.fullName || p.proposalNumber;
-  const label = familyLabel(p);
-  return label ? `${name} — ${label}` : name;
+  const l = lineageOf(p);
+  return l.seq > 0 || p.versionName ? `${name} — ${versionTitle(p)}` : name;
 }
