@@ -4,7 +4,7 @@
 // change only their own password. The server enforces all of it independently
 // (RLS + /api/team-password); the UI just mirrors the rules.
 import { useEffect, useState } from 'react';
-import { ChevronRight, Mail, ShieldCheck, UserPlus } from 'lucide-react';
+import { Check, ChevronRight, Mail, ShieldCheck, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ import {
 import { toast } from '@/components/ui/toast';
 import { useSessionEmail } from '@/components/crm/AuthGate';
 import { supabase } from '@/lib/supabase';
-import { useTeam, useTeamMutations, type TeamMember } from '@/lib/crm/api/team';
+import { ROLE_BLURB, ROLE_LABEL, type TeamRole, useTeam, useTeamMutations, type TeamMember } from '@/lib/crm/api/team';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   saveCrmSettings,
@@ -29,6 +29,7 @@ import {
 } from '@/lib/crm/aging';
 import { STAGE_META, type DealStage } from '@/lib/crm/types';
 import { formatDateUS } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 /** Emails the CRM invitation (app link + install steps; password goes by text). */
 async function sendInvite(toEmail: string, toName: string): Promise<{ ok: boolean; error?: string }> {
@@ -140,6 +141,11 @@ export default function Team() {
                 </div>
                 {m.display_name && <div className="text-xs text-brand-steel">{m.email}</div>}
               </div>
+              {m.role === 'marketing' && (
+                <Badge variant="outline" className="gap-1 text-[10px]">
+                  Marketing — read-only
+                </Badge>
+              )}
               {m.is_admin && (
                 <Badge variant="secondary" className="shrink-0 gap-1 text-[10px]">
                   <ShieldCheck className="h-3 w-3" /> admin
@@ -301,11 +307,10 @@ function MemberCard({
     }
   };
 
-  const toggleAdmin = async (next: boolean) => {
+  const changeRole = async (next: TeamRole) => {
     try {
-      await admin.mutateAsync({ email: member.email, isAdmin: next });
-      toast.success(next ? 'Made admin' : 'Admin removed',
-        next ? `${member.display_name || member.email} can now manage the team.` : undefined);
+      await admin.mutateAsync({ email: member.email, role: next });
+      toast.success(`${member.display_name || member.email} is now ${ROLE_LABEL[next]}`, ROLE_BLURB[next]);
     } catch (err) {
       toast.error('Could not change role', err instanceof Error ? err.message : String(err));
     }
@@ -378,21 +383,34 @@ function MemberCard({
         )}
 
         {iAmAdmin && (
-          <Section label="Role">
-            <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-              <div>
-                <div className="text-sm font-medium text-brand-black">Administrator</div>
-                <div className="text-xs text-brand-steel">
-                  {lastAdmin
-                    ? 'The last admin can’t be demoted — promote someone else first.'
-                    : 'Can add and remove teammates, set passwords, and grant admin.'}
-                </div>
-              </div>
-              <Switch
-                checked={member.is_admin}
-                disabled={lastAdmin || admin.isPending}
-                onCheckedChange={toggleAdmin}
-              />
+          <Section label="Role — what they can see and do">
+            <div className="grid gap-2">
+              {(['admin', 'sales', 'marketing'] as TeamRole[]).map((r) => {
+                const current = (member.role ?? (member.is_admin ? 'admin' : 'sales')) === r;
+                const blocked = lastAdmin && !current; // never strand the team without an admin
+                return (
+                  <button
+                    key={r}
+                    disabled={blocked || admin.isPending}
+                    onClick={() => !current && changeRole(r)}
+                    className={cn(
+                      'rounded-md border p-3 text-left transition-colors disabled:opacity-50',
+                      current ? 'border-brand-orange bg-brand-orange/5' : 'hover:border-brand-orange/40'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-brand-black">
+                      {ROLE_LABEL[r]}
+                      {current && <Check className="h-3.5 w-3.5 text-brand-orange" />}
+                    </div>
+                    <div className="mt-0.5 text-xs text-brand-steel">{ROLE_BLURB[r]}</div>
+                  </button>
+                );
+              })}
+              {lastAdmin && (
+                <p className="text-xs text-brand-steel">
+                  This is your last admin — make someone else an admin first.
+                </p>
+              )}
             </div>
           </Section>
         )}

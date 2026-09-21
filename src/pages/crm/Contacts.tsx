@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ContactDialog } from '@/components/crm/ContactDialog';
+import { useCanWrite } from '@/lib/crm/role';
 import { CsvImportDialog } from '@/components/crm/CsvImportDialog';
 import { useContacts } from '@/lib/crm/api/contacts';
 import { SOURCE_LABEL, SOURCES, type Contact, type ContactSource } from '@/lib/crm/types';
 import { cn } from '@/lib/utils';
 
 export default function Contacts() {
+  const canWrite = useCanWrite();
   const { data: contacts = [], isLoading, error } = useContacts();
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -25,7 +27,7 @@ export default function Contacts() {
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query.trim().toLowerCase()), 200);
-    return () => window.clearTimeout(t);
+  return () => window.clearTimeout(t);
   }, [query]);
 
   const allTags = useMemo(
@@ -82,9 +84,11 @@ export default function Contacts() {
         <Button variant="outline" size="sm" onClick={exportCsv} disabled={!filtered.length}>
           <Download className="mr-1.5 h-4 w-4" /> Export
         </Button>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New contact
-        </Button>
+        {canWrite && (
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New contact
+          </Button>
+        )}
       </div>
 
       <div className="mt-3">

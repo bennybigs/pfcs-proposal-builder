@@ -7,13 +7,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { supabase } from '@/lib/supabase';
+import { useCanUseBuilder } from '@/lib/crm/role';
 
 type GateState = 'checking' | 'in' | 'out';
 
 export function BuilderGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<GateState>('checking');
+  const canUseBuilder = useCanUseBuilder();
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -26,7 +29,29 @@ export function BuilderGate({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (state === 'in') return <>{children}</>;
+  if (state === 'in' && canUseBuilder) return <>{children}</>;
+
+  // signed in, but a marketing account: proposals and prices aren't theirs
+  if (state === 'in') {
+    return (
+      <div className="min-h-screen bg-brand-gray-bg">
+        <AppHeader />
+        <main className="mx-auto max-w-[1800px] px-4 py-10">
+          <div className="mx-auto max-w-sm rounded-lg border bg-white p-6 text-center shadow-sm">
+            <Lock className="mx-auto h-6 w-6 text-brand-steel/60" />
+            <h2 className="mt-2 text-lg font-semibold text-brand-black">Sales team only</h2>
+            <p className="mt-1 text-sm text-brand-steel">
+              Your account is set up for marketing: leads, sources and results. Proposals and
+              pricing stay with the sales team. Ask Ben if you need more.
+            </p>
+            <Button asChild className="mt-4">
+              <Link to="/crm/leads">Go to leads</Link>
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-gray-bg">

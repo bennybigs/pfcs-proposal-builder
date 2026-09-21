@@ -129,6 +129,14 @@ async function reconcile(sb: SupabaseClient): Promise<void> {
   }
   setStatus('syncing');
   try {
+    // marketing accounts have no proposal access — nothing to sync, and the
+    // library is deliberately out of their reach
+    const { data: meRow } = await sb.from('team_members').select('role').eq('email', email).maybeSingle();
+    if ((meRow as { role?: string } | null)?.role === 'marketing') {
+      setStatus('off');
+      return;
+    }
+
     const ledger = loadLedger();
 
     // a different person signed in on this device: the cache was theirs

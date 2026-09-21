@@ -6,7 +6,7 @@
 // All row actions are the SHARED CardActions components — identical code
 // paths to the board card face and the opened drawer.
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Clock, MoreHorizontal, PauseCircle, Phone, Plus, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
 import { NewLeadDialog } from '@/components/crm/NewLeadDialog';
+import { useCanWrite } from '@/lib/crm/role';
 import {
   AssigneePicker,
   HoldDialog,
@@ -38,6 +39,7 @@ import { formatDateUS } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 export default function Leads() {
+  const canWrite = useCanWrite();
   const { data: contacts = [], isLoading, error } = useContacts();
   const { data: deals = [], isLoading: dealsLoading } = useDeals();
   const { data: team = [] } = useTeam();
@@ -91,7 +93,6 @@ export default function Leads() {
     [deals, contactById]
   );
 
-  if (team.length > 0 && me && !iAmAdmin) return <Navigate to="/crm/my" replace />;
 
   return (
     <div className="pb-20 sm:pb-0">
@@ -99,9 +100,11 @@ export default function Leads() {
         <h1 className="text-xl font-bold text-brand-black">Leads</h1>
         {active.length > 0 && <Badge variant="secondary">{active.length}</Badge>}
         <div className="flex-1" />
-        <Button size="sm" className="hidden sm:inline-flex" onClick={() => setNewLeadOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New lead
-        </Button>
+        {canWrite && (
+          <Button size="sm" className="hidden sm:inline-flex" onClick={() => setNewLeadOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New lead
+          </Button>
+        )}
       </div>
       <p className="mt-1 text-sm text-brand-steel">
         New inquiries waiting on a first move — the same cards that run the pipeline, sitting at
@@ -141,7 +144,7 @@ export default function Leads() {
         </div>
       )}
 
-      {iAmAdmin && unassigned.length > 0 && (
+      {canWrite && unassigned.length > 0 && (
         <div className="mt-6">
           <Section title="Unassigned deals" hint="past the Lead stage but nobody owns them">
             {unassigned.map((d) => (
@@ -151,6 +154,7 @@ export default function Leads() {
         </div>
       )}
 
+      {canWrite && (
       <button
         onClick={() => setNewLeadOpen(true)}
         title="New lead"
@@ -158,6 +162,7 @@ export default function Leads() {
       >
         <Plus className="h-6 w-6" />
       </button>
+      )}
 
       <NewLeadDialog open={newLeadOpen} onOpenChange={setNewLeadOpen} />
     </div>
@@ -201,6 +206,7 @@ function LeadRow({
   iAmAdmin: boolean;
   settings: CrmSettings;
 }) {
+  const canWrite = useCanWrite();
   const [holdOpen, setHoldOpen] = useState(false);
   const [lostOpen, setLostOpen] = useState(false);
 
@@ -247,6 +253,7 @@ function LeadRow({
         </span>
       </div>
       {/* the same shared action components the board card and drawer use */}
+      {canWrite && (
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {phoneOk && (
           <Button asChild variant="outline" size="sm" className="h-8">
@@ -276,6 +283,7 @@ function LeadRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      )}
 
       <HoldDialog deal={deal} contact={contact} open={holdOpen} onOpenChange={setHoldOpen} />
       <LostDialog deal={deal} contact={contact} open={lostOpen} onOpenChange={setLostOpen} />

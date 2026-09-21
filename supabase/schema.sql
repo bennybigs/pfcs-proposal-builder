@@ -830,3 +830,180 @@ begin
     alter publication supabase_realtime add table public.builder_shared;
   end if;
 end $$;
+
+-- ── who can do what: three roles ───────────────────────────────────────
+-- admin      — everything (Ben, Shawn)
+-- sales      — their own jobs, plus unclaimed new leads so nothing sits
+--              invisible waiting to be handed out
+-- marketing  — reads every lead and what became of it (source, stage,
+--              value) for attribution; no proposals, no call notes, no
+--              edits anywhere. Built for an outside agency.
+alter table public.team_members
+  add column if not exists role text not null default 'sales';
+do $$ begin
+  alter table public.team_members add constraint team_members_role_chk
+    check (role in ('admin','sales','marketing'));
+exception when duplicate_object then null; end $$;
+
+update public.team_members set role = 'admin' where is_admin and role <> 'admin';
+update public.team_members set role = 'sales' where not is_admin and role = 'admin';
+
+-- is_admin and role must never disagree (older code writes is_admin)
+create or replace function public.sync_member_role() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.role = 'admin' then new.is_admin := true;
+    elsif new.is_admin then new.role := 'admin'; end if;
+    return new;
+  end if;
+  if new.role is distinct from old.role then
+    new.is_admin := (new.role = 'admin');
+  elsif new.is_admin is distinct from old.is_admin then
+    new.role := case when new.is_admin then 'admin' else 'sales' end;
+  end if;
+  return new;
+end $$;
+drop trigger if exists team_members_sync_role on public.team_members;
+create trigger team_members_sync_role before insert or update on public.team_members
+  for each row execute function public.sync_member_role();
+
+create or replace function public.member_role() returns text
+language sql stable security definer set search_path = public as $$
+  select role from public.team_members where email = auth.email();
+$$;
+
+create or replace function public.is_marketing() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(public.member_role(), '') = 'marketing';
+$$;
+
+/** Marketing is read-only everywhere; everyone else writes what they can see. */
+create or replace function public.can_write() returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_member() and not public.is_marketing();
+$$;
+
+-- an unclaimed lead is visible to the whole sales team until someone takes it
+create or replace function public.can_see_deal(did uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_admin()
+      or public.is_marketing()
+      or exists (select 1 from public.deals d
+                   where d.id = did
+                     and (d.assigned_to = auth.email()
+                          or d.assigned_to is null
+                          or d.assigned_to = ''));
+$$;
+
+create or replace function public.can_see_contact(cid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_team_admin()
+      or public.is_marketing()
+      or exists (select 1 from public.contacts c
+                   where c.id = cid and c.owner = auth.uid())
+      or exists (select 1 from public.deals d
+                   where d.contact_id = cid
+                     and (d.assigned_to = auth.email()
+                          or d.assigned_to is null
+                          or d.assigned_to = ''));
+$$;
+
+-- deals: see what you may; write only if you're not marketing
+drop policy if exists "role select" on public.deals;
+create policy "role select" on public.deals for select
+  using (public.is_team_member() and public.can_see_deal(id));
+drop policy if exists "role insert" on public.deals;
+create policy "role insert" on public.deals for insert
+  with check (public.can_write() and (public.is_team_admin() or assigned_to = auth.email() or assigned_to is null or assigned_to = ''));
+drop policy if exists "role update" on public.deals;
+create policy "role update" on public.deals for update
+  using (public.can_write() and public.can_see_deal(id))
+  with check (public.can_write() and (public.is_team_admin() or assigned_to = auth.email() or assigned_to is null or assigned_to = ''));
+drop policy if exists "role delete" on public.deals;
+create policy "role delete" on public.deals for delete
+  using (public.can_write() and (public.is_team_admin() or assigned_to = auth.email()));
+
+-- contacts
+drop policy if exists "role insert" on public.contacts;
+create policy "role insert" on public.contacts for insert with check (public.can_write());
+drop policy if exists "role update" on public.contacts;
+create policy "role update" on public.contacts for update
+  using (public.can_write() and public.can_see_contact(id))
+  with check (public.can_write() and public.can_see_contact(id));
+drop policy if exists "role delete" on public.contacts;
+create policy "role delete" on public.contacts for delete
+  using (public.can_write() and public.can_see_contact(id));
+
+-- call notes and timeline: not marketing's business, and they write nothing
+drop policy if exists "role select" on public.activities;
+create policy "role select" on public.activities for select
+  using (public.is_team_member() and not public.is_marketing() and public.can_see_contact(contact_id));
+drop policy if exists "role insert" on public.activities;
+create policy "role insert" on public.activities for insert
+  with check (public.can_write() and public.can_see_contact(contact_id));
+drop policy if exists "role update" on public.activities;
+create policy "role update" on public.activities for update
+  using (public.can_write() and public.can_see_contact(contact_id) and source = 'manual' and logged_by = auth.email())
+  with check (public.can_write() and public.can_see_contact(contact_id) and source = 'manual' and logged_by = auth.email());
+drop policy if exists "role delete" on public.activities;
+create policy "role delete" on public.activities for delete
+  using (public.can_write() and public.can_see_contact(contact_id) and source = 'manual' and logged_by = auth.email());
+
+-- tasks and proposal links: sales side only
+drop policy if exists "role all" on public.tasks;
+create policy "role select" on public.tasks for select
+  using (public.is_team_member() and not public.is_marketing()
+         and ((contact_id is not null and public.can_see_contact(contact_id))
+              or (deal_id is not null and public.can_see_deal(deal_id))));
+create policy "role write" on public.tasks for all
+  using (public.can_write() and ((contact_id is not null and public.can_see_contact(contact_id))
+                                 or (deal_id is not null and public.can_see_deal(deal_id))))
+  with check (public.can_write() and ((contact_id is not null and public.can_see_contact(contact_id))
+                                 or (deal_id is not null and public.can_see_deal(deal_id))));
+
+drop policy if exists "role all" on public.proposal_links;
+create policy "role select" on public.proposal_links for select
+  using (public.is_team_member() and not public.is_marketing() and public.can_see_deal(deal_id));
+create policy "role write" on public.proposal_links for all
+  using (public.can_write() and public.can_see_deal(deal_id))
+  with check (public.can_write() and public.can_see_deal(deal_id));
+
+-- proposals: marketing never sees them (can_see_proposal has no marketing arm)
+drop policy if exists "role insert" on public.proposals;
+create policy "role insert" on public.proposals for insert with check (public.can_write());
+drop policy if exists "role update" on public.proposals;
+create policy "role update" on public.proposals for update
+  using (public.can_write() and public.can_see_proposal(id, created_by, data))
+  with check (public.can_write() and public.can_see_proposal(id, created_by, data));
+drop policy if exists "role delete" on public.proposals;
+create policy "role delete" on public.proposals for delete
+  using (public.can_write() and public.can_see_proposal(id, created_by, data));
+
+-- the shared card library is the sales team's; marketing reads nothing of it
+drop policy if exists "team insert" on public.builder_shared;
+create policy "team insert" on public.builder_shared for insert with check (public.can_write());
+drop policy if exists "team update" on public.builder_shared;
+create policy "team update" on public.builder_shared for update
+  using (public.can_write()) with check (public.can_write());
+drop policy if exists "team delete" on public.builder_shared;
+create policy "team delete" on public.builder_shared for delete using (public.can_write());
+drop policy if exists "team select" on public.builder_shared;
+create policy "team select" on public.builder_shared for select
+  using (public.is_team_member() and not public.is_marketing());
+
+-- Nobody promotes themselves. Changing a role (or the admin flag) is an
+-- admin-only act, whichever row it happens on. Before this, a member could
+-- edit their own row and become an admin.
+create or replace function public.guard_role_change() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if (new.role is distinct from old.role or new.is_admin is distinct from old.is_admin)
+     and not public.is_team_admin() then
+    raise exception 'Only an admin can change a team member''s role';
+  end if;
+  return new;
+end $$;
+drop trigger if exists team_members_guard_role on public.team_members;
+create trigger team_members_guard_role before update on public.team_members
+  for each row execute function public.guard_role_change();

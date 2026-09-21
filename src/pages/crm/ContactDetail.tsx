@@ -32,6 +32,7 @@ import { toast } from '@/components/ui/toast';
 import { ContactDialog } from '@/components/crm/ContactDialog';
 import { ContactFiles } from '@/components/crm/ContactFiles';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
+import { useCanWrite } from '@/lib/crm/role';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
 import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/components/crm/AuthGate';
@@ -75,6 +76,7 @@ const TYPE_ICON: Record<ActivityType, React.ReactNode> = {
 };
 
 export default function ContactDetail() {
+  const canWrite = useCanWrite();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: contact, isLoading } = useContact(id);
@@ -188,7 +190,7 @@ export default function ContactDetail() {
                 {SOURCE_LABEL[contact.source]}
                 {contact.source_detail ? ` · ${contact.source_detail}` : ''}
               </Badge>
-              <ContactTypeControl contact={contact} />
+              {canWrite ? <ContactTypeControl contact={contact} /> : <span className="text-sm text-brand-black">{CONTACT_TYPE_LABEL[(contact.type || 'customer') as keyof typeof CONTACT_TYPE_LABEL]}</span>}
               {contact.tags.map((t) => (
                 <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
               ))}
@@ -207,10 +209,10 @@ export default function ContactDetail() {
               <Mail className="mr-1.5 h-3.5 w-3.5" /> Email
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          {canWrite && <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-          </Button>
-          <NewProposalButton contact={contact} />
+          </Button>}
+          {canWrite && <NewProposalButton contact={contact} />}
           <Button size="sm" onClick={newDeal} disabled={createDeal.isPending}>
             <Plus className="mr-1.5 h-3.5 w-3.5" /> New deal
           </Button>

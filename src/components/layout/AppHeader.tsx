@@ -16,6 +16,7 @@ import { useSessionEmail } from '@/lib/crm/session';
 import { supabase } from '@/lib/supabase';
 import { startLeadBadge, useLeadBadge } from '@/lib/crm/leadBadge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { useCanUseBuilder } from '@/lib/crm/role';
 
 /**
  * Quiet by default. Sync is automatic and always was — a permanent "Team
@@ -64,6 +65,7 @@ function SyncBadge() {
  */
 function ProfileButton() {
   const email = useSessionEmail();
+  const canUseBuilder = useCanUseBuilder();
   if (!supabase || !email) return null;
   const initials = email.slice(0, 2).toUpperCase();
   return (
@@ -92,11 +94,13 @@ function ProfileButton() {
             <Users className="mr-2 h-4 w-4" /> Team &amp; notifications
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/settings">
-            <Settings className="mr-2 h-4 w-4" /> Proposal Settings
-          </Link>
-        </DropdownMenuItem>
+        {canUseBuilder && (
+          <DropdownMenuItem asChild>
+            <Link to="/settings">
+              <Settings className="mr-2 h-4 w-4" /> Proposal Settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-red-600"
@@ -134,6 +138,8 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
   // Red lead counter on the CRM tab — visible from every page, so a fresh
   // inquiry gets noticed even while building proposals. Polls once a minute.
   const leadCount = useLeadBadge((s) => s.count);
+  const canUseBuilder = useCanUseBuilder();
+  const nav = NAV.filter((item) => canUseBuilder || item.to === '/crm');
   useEffect(() => startLeadBadge(), []);
   return (
     <header className="no-print sticky top-0 z-40 border-b bg-white shadow-sm">
@@ -147,7 +153,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
             />
           </Link>
           <nav className="flex items-center gap-1">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
@@ -180,7 +186,7 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
           <ProfileButton />
         </div>
       </div>
-      {PROPOSAL_ROUTES.includes(pathname) && (
+      {canUseBuilder && PROPOSAL_ROUTES.includes(pathname) && (
         <div className="border-t bg-white">
           <nav className="mx-auto flex max-w-[1800px] items-center gap-1 px-4 py-2">
             {PROPOSAL_SUBNAV.map((item) => (

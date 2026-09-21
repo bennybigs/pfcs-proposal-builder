@@ -46,6 +46,7 @@ import {
   formatDollars,
   type DealSegment,
 } from '@/lib/crm/types';
+import { useMyRole } from '@/lib/crm/role';
 import { useTeam } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/components/crm/AuthGate';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,9 @@ export default function Reports() {
   const { data: team = [] } = useTeam();
   const me = useSessionEmail();
   const iAmAdmin = !!team.find((t) => t.email === me)?.is_admin;
+  // marketing exists to answer "which campaigns produced signed work"
+  const myRole = useMyRole();
+  const canSeeReports = iAmAdmin || myRole === 'marketing';
   const [params, setParams] = useSearchParams();
 
   const preset = (params.get('range') as RangePreset) || 'last_12';
@@ -260,10 +264,10 @@ export default function Reports() {
   if (isLoading || (team.length === 0 && !me)) {
     return <p className="text-sm text-brand-steel">Loading…</p>;
   }
-  if (team.length > 0 && !iAmAdmin) {
+  if (team.length > 0 && !canSeeReports) {
     return (
       <div className="rounded-lg border bg-white p-8 text-center shadow-sm">
-        <p className="font-medium text-brand-black">Reports are owner-only.</p>
+        <p className="font-medium text-brand-black">Reports are for admins and marketing.</p>
         <p className="mt-1 text-sm text-brand-steel">
           Ask an admin if you need a number from here — your own pipeline lives in My Leads.
         </p>

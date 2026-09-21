@@ -1,9 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sb } from '@/lib/supabase';
 
+export type TeamRole = 'admin' | 'sales' | 'marketing';
+
+export const ROLE_LABEL: Record<TeamRole, string> = {
+  admin: 'Admin',
+  sales: 'Sales',
+  marketing: 'Marketing',
+};
+
+export const ROLE_BLURB: Record<TeamRole, string> = {
+  admin: 'Everything: every lead, job, proposal and price, plus the team list.',
+  sales: 'Their own jobs and any unclaimed new lead, with proposals for those jobs.',
+  marketing: 'Read-only: every lead with its source and what it became. No proposals, no prices to edit, no call notes.',
+};
+
 export interface TeamMember {
   email: string;
   display_name: string;
+  role: TeamRole;
   is_admin: boolean;
   email_notifications: boolean;
   added_at: string;
@@ -34,10 +49,10 @@ export async function renameTeamMember(email: string, displayName: string): Prom
   if (!count) throw new Error('No permission — only admins can rename.');
 }
 
-export async function setAdmin(email: string, isAdmin: boolean): Promise<void> {
+export async function setRole(email: string, role: TeamRole): Promise<void> {
   const { error, count } = await sb()
     .from('team_members')
-    .update({ is_admin: isAdmin }, { count: 'exact' })
+    .update({ role }, { count: 'exact' })
     .eq('email', email);
   if (error) throw error;
   if (!count) throw new Error('No permission — only admins can change roles.');
@@ -79,7 +94,7 @@ export function useTeamMutations() {
   });
   const remove = useMutation({ mutationFn: removeTeamMember, onSuccess: invalidate });
   const admin = useMutation({
-    mutationFn: ({ email, isAdmin }: { email: string; isAdmin: boolean }) => setAdmin(email, isAdmin),
+    mutationFn: ({ email, role }: { email: string; role: TeamRole }) => setRole(email, role),
     onSuccess: invalidate,
   });
   const rename = useMutation({
@@ -92,3 +107,5 @@ export function useTeamMutations() {
   });
   return { add, remove, admin, rename, emailPref };
 }
+
+export { useMyRole, useCanWrite, type TeamRole as MyTeamRole } from '@/lib/crm/role';

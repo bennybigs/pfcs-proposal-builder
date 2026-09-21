@@ -71,6 +71,7 @@ import {
 } from '@/components/crm/CardActions';
 import { useProposalStore } from '@/store/useProposalStore';
 import { createVersion } from '@/lib/crm/integration/versions';
+import { useCanWrite } from '@/lib/crm/role';
 import { familyLabel, lockReason } from '@/lib/proposalFamily';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
@@ -151,6 +152,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const canWrite = useCanWrite();
   const { data: links = [] } = useDealProposalLinks(deal ? [deal.id] : []);
   const { data: activities = [] } = useContactActivities(contact?.id);
   const { data: contactDeals = [] } = useContactDeals(contact?.id);
@@ -330,18 +332,24 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
           <div className="flex items-start gap-2 pr-8">
             <SheetTitle className="min-w-0 flex-1">{draft.title || deal.title}</SheetTitle>
             {/* same actions as the card face — one shared component */}
-            <CardOverflowMenu
+            {canWrite && <CardOverflowMenu
               deal={deal}
               contact={contact}
               iAmAdmin={iAmAdmin}
               onDeleted={onClose}
               className="shrink-0"
-            />
+            />}
           </div>
         </SheetHeader>
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-          <StageChipControl deal={deal} contact={contact} />
+          {canWrite ? (
+            <StageChipControl deal={deal} contact={contact} />
+          ) : (
+            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', STAGE_META[deal.stage]?.color)}>
+              {STAGE_META[deal.stage]?.label ?? deal.stage}
+            </span>
+          )}
           {held && deal.held_until && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
               On hold → {formatDateUS(deal.held_until)}
@@ -404,14 +412,14 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 </a>
               </Button>
             )}
-            <LogButton
+            {canWrite && <LogButton
               deal={deal}
               contact={contact}
               className="flex-1"
               forceOpen={logForceOpen}
               onForceHandled={() => setLogForceOpen(false)}
               initialType="call"
-            />
+            />}
             {!phoneOk && (
               <button
                 className="w-full text-left text-xs font-medium text-brand-orange underline-offset-2 hover:underline"
@@ -430,7 +438,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
         {contact && <IntakeNote contact={contact} dealId={deal.id} onSaved={invalidate} />}
 
         {/* note composer: always one tap away, no scrolling past the form */}
-        {contact && <NoteComposer contactId={contact.id} dealId={deal.id} />}
+        {contact && canWrite && <NoteComposer contactId={contact.id} dealId={deal.id} />}
 
         {/* ── editable record ── */}
         <div className="mt-4 grid gap-3">
@@ -531,7 +539,11 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
           {/* live controls (they log + notify on their own, outside Save) */}
           <Field label="Assigned to">
-            <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} className="h-9 w-full" />
+            {canWrite ? (
+              <AssigneePicker deal={deal} team={team} me={me} iAmAdmin={iAmAdmin} className="h-9 w-full" />
+            ) : (
+              <div className="text-sm text-brand-black">{memberName(team, deal.assigned_to)}</div>
+            )}
             {deal.closed_by && (
               <p className="text-xs text-brand-steel">
                 Closed by {memberName(team, deal.closed_by)} — locked in when the deal was won.
@@ -545,7 +557,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
         <div className="mt-5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-brand-black">Proposals</h3>
-            {contact && <NewProposalButton contact={contact} deal={deal} />}
+            {contact && canWrite && <NewProposalButton contact={contact} deal={deal} />}
           </div>
           {links.length === 0 ? (
             <p className="mt-1 text-xs text-brand-steel">
