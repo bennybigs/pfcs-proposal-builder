@@ -3,7 +3,7 @@
 // the things you can do along the top: Edit, Revise, Duplicate, Send.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, Pencil, Plus, Send } from 'lucide-react';
+import { ArrowLeft, Copy, FilePlus2, Pencil, Plus, Printer, Send } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,14 @@ import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { createVersion } from '@/lib/crm/integration/versions';
 import { logProposalEvent } from '@/lib/crm/integration/proposalEvents';
-import { familyLabel, familyOf, lineageOf, versionLetter } from '@/lib/proposalFamily';
+import {
+  changeOrdersOf,
+  familyLabel,
+  familyOf,
+  isApproved,
+  lineageOf,
+  versionLetter,
+} from '@/lib/proposalFamily';
 import { buildShareUrl, companySnapshot } from '@/lib/shareLink';
 import { grandTotal } from '@/lib/pricing';
 import { formatCurrency, formatDateUS } from '@/lib/format';
@@ -76,13 +83,27 @@ export default function Versions() {
     );
   }
 
-  const versions = familyOf(Object.values(proposals), opened);
+  const all = Object.values(proposals);
+  const versions = familyOf(all, opened);
   const closed = Boolean(shown.supersededBy || shown.notChosen);
   const nextLetter = versionLetter(versions.length);
+  // change orders hang off whichever version was signed
+  const contract = versions.find((v) => isApproved(v)) ?? versions[versions.length - 1];
+  const changeOrders = contract ? changeOrdersOf(all, contract.id) : [];
+  const approvedCos = changeOrders.filter(isApproved);
+  const contractTotal = contract ? Math.round(grandTotal(contract)) : 0;
+  const amendedTotal = contractTotal + approvedCos.reduce((sum, co) => sum + Math.round(grandTotal(co)), 0);
+  const signed = contract ? isApproved(contract) : false;
+  const viewingCo = shown.kind === 'change_order';
 
   const revise = () => {
     const copy = createVersion(shown.id, 'revision');
     if (copy) navigate(`/proposal/${copy.id}`);
+  };
+  const newChangeOrder = () => {
+    if (!contract) return;
+    const co = createVersion(contract.id, 'change_order');
+    if (co) navigate(`/proposal/${co.id}`);
   };
   const duplicate = () => {
     if (!duplicating) return;
@@ -96,7 +117,7 @@ export default function Versions() {
       <AppHeader />
 
       {/* what you can do with the version you're looking at */}
-      <div className="sticky top-16 z-30 border-b bg-white shadow-sm sm:top-20">
+      <div className="no-print sticky top-16 z-30 border-b bg-white shadow-sm sm:top-20">
         <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2 px-4 py-2">
           <Button asChild variant="outline" size="sm">
             <Link to="/">
@@ -108,7 +129,7 @@ export default function Versions() {
               {opened.project.referenceName || 'Untitled Project'}
             </div>
             <div className="truncate text-xs text-brand-steel">
-              {familyLabel(shown)}
+              {viewingCo ? `Change order to ${shown.changeOrder?.contractNumber}` : familyLabel(shown)}
               {shown.versionName ? ` — ${shown.versionName}` : ''} · {shown.proposalNumber} ·{' '}
               {stateOf(shown)}
             </div>
@@ -139,6 +160,14 @@ export default function Versions() {
           >
             <Copy className="h-4 w-4" /> Duplicate → Version {nextLetter}
           </Button>
+          {signed && (
+            <Button size="sm" variant="outline" onClick={newChangeOrder}>
+              <FilePlus2 className="h-4 w-4" /> Change order
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => window.print()} title="Print this sheet (or save it as a PDF)">
+            <Printer className="h-4 w-4" /> Print
+          </Button>
           <Button size="sm" onClick={() => setSendOpen(true)}>
             <Send className="h-4 w-4" /> Send…
           </Button>
@@ -147,7 +176,7 @@ export default function Versions() {
 
       <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 lg:flex-row">
         {/* the versions — titled and stamped */}
-        <aside className="w-full shrink-0 lg:w-[320px]">
+        <aside className="no-print w-full shrink-0 lg:w-[320px]">
           <h2 className="mb-2 font-heading text-xs font-bold uppercase tracking-wider text-brand-steel">
             {versions.length} version{versions.length === 1 ? '' : 's'} of{' '}
             {lineageOf(opened).baseNumber}
@@ -191,11 +220,71 @@ export default function Versions() {
               );
             })}
           </div>
+          {contract && (changeOrders.length > 0 || signed) && (
+            <div className="mt-6">
+              <h2 className="mb-2 font-heading text-xs font-bold uppercase tracking-wider text-brand-steel">
+                Change orders to {contract.proposalNumber}
+              </h2>
+              {changeOrders.length === 0 && (
+                <p className="mb-2 text-xs text-brand-steel">
+                  None yet. A change order adds to or takes off the signed contract on its own
+                  sheet — the contract itself never changes.
+                </p>
+              )}
+              <div className="grid gap-2">
+                {changeOrders.map((co) => {
+                  const delta = Math.round(grandTotal(co));
+                  const active = co.id === shown.id;
+                  return (
+                    <button
+                      key={co.id}
+                      onClick={() => setShowId(co.id)}
+                      className={cn(
+                        'rounded-lg border-l-4 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md',
+                        active ? 'border-brand-orange ring-1 ring-brand-orange' : 'border-brand-gray-light'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-heading text-sm font-bold uppercase tracking-wide">
+                          CO-{co.changeOrder?.number}
+                        </span>
+                        <Badge
+                          className={(STATUS_META[co.status] ?? STATUS_META.draft).className}
+                          variant="secondary"
+                        >
+                          {isApproved(co) ? 'Approved' : stateOf(co)}
+                        </Badge>
+                        <span className={cn('ml-auto text-sm font-bold', delta < 0 ? 'text-green-700' : 'text-brand-orange')}>
+                          {delta < 0 ? `(${formatCurrency(Math.abs(delta))})` : `+${formatCurrency(delta)}`}
+                        </span>
+                      </div>
+                      <div className="mt-1 grid gap-0.5 text-[11px] text-brand-steel">
+                        <span>Created {stamp(co.createdAt)}</span>
+                        <span>{co.sentAt ? `Sent ${stamp(co.sentAt)}` : 'Not sent yet'}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {approvedCos.length > 0 && (
+                <div className="mt-2 rounded-lg border bg-white p-3 text-sm">
+                  <div className="flex items-baseline justify-between text-brand-steel">
+                    <span>Contract as signed</span>
+                    <span>{formatCurrency(contractTotal)}</span>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between font-semibold text-brand-black">
+                    <span>With {approvedCos.length} approved change order{approvedCos.length === 1 ? '' : 's'}</span>
+                    <span className="text-brand-orange">{formatCurrency(amendedTotal)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         {/* the proposal itself, exactly as the customer sees it */}
         <section className="min-w-0 flex-1">
-          <div className="light-scope rounded-lg bg-brand-gray-bg p-2 sm:p-4">
+          <div className="light-scope print-sheet rounded-lg bg-brand-gray-bg p-2 sm:p-4">
             <CustomerProposal proposal={shown} company={companySnapshot(settings)} />
           </div>
         </section>

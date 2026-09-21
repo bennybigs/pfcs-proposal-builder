@@ -47,6 +47,19 @@ export interface Proposal {
     /** @deprecated earlier "Option 2" numbering */
     option?: number;
   };
+  /**
+   * A change order is its own signed sheet against a SIGNED contract: what
+   * is being added or removed, the price difference (which may be negative),
+   * and the amended contract total. The contract itself is never edited.
+   */
+  kind?: 'proposal' | 'change_order';
+  changeOrder?: {
+    ofId: string; // the contract this amends
+    number: number; // 1, 2, 3 → CO-1, CO-2
+    contractNumber: string; // as signed, for the sheet's header
+    contractTotal: number; // as signed, so the amended total is provable
+    contractSignedAt?: string;
+  };
   /** Name given to a duplicate: "40x72 with lean-to". */
   versionName?: string;
   /** When this version first went to the customer. */
@@ -61,7 +74,7 @@ export interface Proposal {
    * device, never syncs, and changes nothing about the proposal it came from
    * until Save. Discard removes it without a trace.
    */
-  pendingVersion?: { kind: 'revision' | 'duplicate'; sourceId: string };
+  pendingVersion?: { kind: 'revision' | 'duplicate' | 'change_order'; sourceId: string };
   /**
    * This device's offline edits to a proposal that a teammate also changed
    * in the meantime. The team's version stays; this copy waits on this

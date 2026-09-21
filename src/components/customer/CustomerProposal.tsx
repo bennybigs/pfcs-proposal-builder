@@ -39,6 +39,11 @@ export function CustomerProposal({
 }) {
   const pricing = proposalPricing(proposal);
   const total = pricing.total;
+  // A change order is the same document with a different job: it states what
+  // is being added or taken off the signed contract, the difference in price
+  // (which can be a credit), and the amended contract total.
+  const co = proposal.kind === 'change_order' ? proposal.changeOrder : undefined;
+  const amendedTotal = co ? co.contractTotal + total : total;
   const visibleCards = proposal.cards.filter((c) => c.isEnabled);
   const showTotal = proposal.showGrandTotalToCustomer;
   const showMarkupLine = showTotal && pricing.markupVisible && pricing.markupAmount !== 0;
@@ -54,12 +59,21 @@ export function CustomerProposal({
           )}
         </div>
         <div className="text-left sm:text-right">
-          <div className="font-heading text-2xl font-bold uppercase tracking-wide">Proposal</div>
+          <div className="font-heading text-2xl font-bold uppercase tracking-wide">
+            {co ? `Change Order ${proposal.changeOrder?.number ?? ''}` : 'Proposal'}
+          </div>
           <div className="text-sm text-brand-steel">{proposal.proposalNumber}</div>
           <div className="text-sm text-brand-steel">{formatDateLong(proposal.createdAt)}</div>
-          <div className="text-xs italic text-brand-steel">
-            Valid through {formatDateLong(addDays(proposal.createdAt, PROPOSAL_VALID_DAYS))}
-          </div>
+          {co ? (
+            <div className="text-xs text-brand-steel">
+              To contract <span className="font-semibold">{co.contractNumber}</span>
+              {co.contractSignedAt ? ` signed ${formatDateLong(co.contractSignedAt)}` : ''}
+            </div>
+          ) : (
+            <div className="text-xs italic text-brand-steel">
+              Valid through {formatDateLong(addDays(proposal.createdAt, PROPOSAL_VALID_DAYS))}
+            </div>
+          )}
         </div>
       </header>
 
@@ -123,7 +137,16 @@ export function CustomerProposal({
         ))}
       </div>
 
-      {/* Payment schedule */}
+      {/* Payment schedule — a change order bills under the contract's own
+          schedule, so it says that instead of re-splitting the difference */}
+      {co ? (
+        <section className="payment-block mt-8">
+          <div className="section-banner">Payment</div>
+          <div className="border border-t-0 border-brand-gray-light bg-white p-5 text-sm">
+            This change order is billed under the payment schedule of contract {co.contractNumber}.
+          </div>
+        </section>
+      ) : (
       <section className="payment-block mt-8">
         <div className="section-banner">Payment Schedule</div>
         <div className="border border-t-0 border-brand-gray-light bg-white p-5">
@@ -146,6 +169,8 @@ export function CustomerProposal({
           </div>
         </div>
       </section>
+
+      )}
 
       {/* Subtotal / markup / sales tax breakdown */}
       {(showMarkupLine || showTaxLine) && (
@@ -173,16 +198,32 @@ export function CustomerProposal({
         </section>
       )}
 
+      {/* Change order maths: contract → this change → amended total */}
+      {co && showTotal && (
+        <section className="mt-8 border border-brand-gray-light bg-white px-5 py-3">
+          <div className="flex items-baseline justify-between py-1 text-sm">
+            <span>Original contract {co.contractNumber}</span>
+            <span className="font-semibold">{formatCurrency(co.contractTotal)}</span>
+          </div>
+          <div className="flex items-baseline justify-between border-t border-brand-gray-light py-1 pt-2 text-sm">
+            <span>This change order ({total < 0 ? 'credit' : 'addition'})</span>
+            <span className="font-semibold">
+              {total < 0 ? `(${formatCurrency(Math.abs(total))})` : formatCurrency(total)}
+            </span>
+          </div>
+        </section>
+      )}
+
       {/* Grand total */}
       {showTotal && (
         <section className="grand-total-block mt-8 flex items-center justify-between bg-brand-black px-5 py-4 text-white"
           style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
         >
           <span className="font-heading text-lg font-bold uppercase tracking-wide">
-            Total Investment
+            {co ? 'Amended Contract Total' : 'Total Investment'}
           </span>
           <span className="font-heading text-2xl font-bold text-brand-orange-light">
-            {formatCurrency(total)}
+            {formatCurrency(co ? amendedTotal : total)}
           </span>
         </section>
       )}
@@ -197,11 +238,20 @@ export function CustomerProposal({
       )}
 
       {/* Acceptance — always follows the body, never removable */}
-      <AcceptanceBlock />
+      <AcceptanceBlock changeOrderOf={co?.contractNumber} />
 
-      {/* Standard Terms and Conditions — attached to every proposal, with
-          the acceptance grid and both Notice of Cancellation copies */}
-      <StandardTerms company={company} />
+      {/* Standard Terms: on a proposal they're the agreement; on a change
+          order the signed contract's terms already govern, so this sheet
+          says so rather than restating them. */}
+      {co ? (
+        <p className="mt-6 text-xs leading-relaxed text-brand-steel">
+          All terms and conditions of contract {co.contractNumber} remain in force and apply to
+          this change order. Work described here is authorized only when this sheet is signed by
+          both parties.
+        </p>
+      ) : (
+        <StandardTerms company={company} />
+      )}
 
       <footer className="mt-8 border-t border-brand-gray-light pt-4 text-center text-xs text-brand-steel">
         {company.companyName}

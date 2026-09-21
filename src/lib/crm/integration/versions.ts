@@ -12,7 +12,15 @@ import { useProposalStore } from '@/store/useProposalStore';
 import { toast } from '@/components/ui/toast';
 import type { Proposal } from '@/types';
 
-export type VersionKind = 'revision' | 'duplicate';
+export type VersionKind = 'revision' | 'duplicate' | 'change_order';
+
+function activityLine(kind: VersionKind, copy: Proposal, source: Proposal | undefined): string {
+  const what = versionTitle(copy);
+  const of = source?.proposalNumber ?? '';
+  if (kind === 'revision') return `${what} started — revising ${of || 'the sent proposal'}, which is kept as sent`;
+  if (kind === 'change_order') return `${what} started against contract ${of}`;
+  return `${what} started from ${of || 'an existing proposal'} — an alternative for the customer to choose from`;
+}
 
 async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind): Promise<void> {
   if (!copy.crm || !supabase) return;
@@ -61,10 +69,7 @@ async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind)
     contact_id: contactId,
     deal_id: dealId,
     type: 'proposal_event',
-    body:
-      kind === 'revision'
-        ? `${versionTitle(copy)} started — revising ${source?.proposalNumber ?? 'the sent proposal'}, which is kept as sent`
-        : `${versionTitle(copy)} started from ${source?.proposalNumber ?? 'an existing proposal'} — an alternative for the customer to choose from`,
+    body: activityLine(kind, copy, source),
     logged_by: email,
   });
 }
@@ -76,7 +81,9 @@ async function attachToDeal(sourceId: string, copy: Proposal, kind: VersionKind)
  */
 export function createVersion(id: string, kind: VersionKind, name?: string): Proposal | undefined {
   const store = useProposalStore.getState();
-  return kind === 'revision' ? store.reviseProposal(id) : store.duplicateVersion(id, name);
+  if (kind === 'revision') return store.reviseProposal(id);
+  if (kind === 'change_order') return store.createChangeOrder(id);
+  return store.duplicateVersion(id, name);
 }
 
 /** What the save bar calls it: "Version B", or "Version B — 40x72". */
@@ -97,7 +104,9 @@ export function saveVersion(id: string, onSynced?: () => void): Proposal | undef
     `${versionName(saved)} saved`,
     pending.kind === 'revision'
       ? 'The version you sent is kept exactly as the customer saw it.'
-      : 'Both versions stay in the list until the customer signs one.'
+      : pending.kind === 'change_order'
+        ? 'The contract is untouched — this sheet carries the change and its price.'
+        : 'Both versions stay in the list until the customer signs one.'
   );
   void attachToDeal(pending.sourceId, saved, pending.kind)
     .then(() => onSynced?.())

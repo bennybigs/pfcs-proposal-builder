@@ -27,6 +27,8 @@ export function CardEditorPanel({
   count: number;
   onClose: () => void;
 }) {
+  // a change order can carry a credit, so its prices may go negative
+  const allowCredit = useProposalStore((st) => st.proposals[proposalId]?.kind === 'change_order');
   const updateCard = useProposalStore((s) => s.updateCard);
   const removeCard = useProposalStore((s) => s.removeCard);
   const moveCard = useProposalStore((s) => s.moveCard);
@@ -169,7 +171,7 @@ export function CardEditorPanel({
                   <Input
                     id="card-price"
                     type="number"
-                    min={0}
+                    min={allowCredit ? undefined : 0}
                     step={100}
                     className="pl-7"
                     value={card.price ?? ''}

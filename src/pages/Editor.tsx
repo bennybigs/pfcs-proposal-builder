@@ -174,7 +174,7 @@ export default function Editor() {
           (q) => !q.supersededBy && (q.status === 'accepted' || q.status === 'contract')
         )
       : undefined;
-  const openVersion = (kind: 'revision' | 'duplicate') => {
+  const openVersion = (kind: 'revision' | 'duplicate' | 'change_order') => {
     const copy = createVersion(proposal.id, kind);
     if (copy) navigate(`/proposal/${copy.id}`, { state: location.state });
   };
@@ -318,6 +318,9 @@ export default function Editor() {
           setSendOpen(true);
         }}
         guardLeave={guardLeave}
+        onChangeOrder={() => openVersion('change_order')}
+        isChangeOrder={proposal.kind === 'change_order'}
+        canChangeOrder={proposal.status === 'contract' || proposal.status === 'accepted'}
         onRevise={() => openVersion('revision')}
         onAddOption={() => openVersion('duplicate')}
         onCopyForCustomer={() => setCopyOpen(true)}
@@ -416,14 +419,20 @@ export default function Editor() {
               {pending && (
                 <div className="sticky top-0 z-20 rounded-lg border-2 border-brand-orange bg-white p-4 shadow-md">
                   <div className="font-heading text-base font-bold uppercase tracking-wide text-brand-black">
-                    {pending.kind === 'revision' ? 'Revising' : 'Duplicate of'}{' '}
+                    {pending.kind === 'revision'
+                      ? 'Revising'
+                      : pending.kind === 'change_order'
+                        ? 'Change order to'
+                        : 'Duplicate of'}{' '}
                     {pendingSource?.proposalNumber ?? 'this proposal'} — {versionName(proposal)} isn&apos;t saved
                   </div>
                   <p className="mt-0.5 text-sm text-brand-steel">
                     Make your changes, then save or discard.{' '}
                     {pending.kind === 'revision'
                       ? `Nothing happens to ${pendingSource?.proposalNumber ?? 'the original'} or the deal until you save.`
-                      : 'It joins the version list when you save — not before.'}
+                      : pending.kind === 'change_order'
+                        ? 'List only what is changing — an addition, or a credit as a negative price. The contract is not touched.'
+                        : 'It joins the version list when you save — not before.'}
                   </p>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => doDiscard()}>
@@ -589,7 +598,12 @@ export default function Editor() {
         <DialogContent className="max-w-md">
           <DialogTitle>Save {versionName(proposal)}?</DialogTitle>
           <p className="text-sm text-brand-steel">
-            You&apos;re {pending?.kind === 'duplicate' ? 'duplicating' : 'revising'}{' '}
+            You&apos;re{' '}
+            {pending?.kind === 'duplicate'
+              ? 'duplicating'
+              : pending?.kind === 'change_order'
+                ? 'writing a change order to'
+                : 'revising'}{' '}
             {pendingSource?.proposalNumber ?? 'a proposal'} and haven&apos;t saved it. Discard and
             nothing changes.
           </p>

@@ -78,6 +78,13 @@
     display: none !important;
   }
 
+  /* The sheet prints alone: no app background, no rounded card around it. */
+  .print-sheet {
+    background: white !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
   .customer-proposal {
     box-shadow: none !important;
     border: none !important;

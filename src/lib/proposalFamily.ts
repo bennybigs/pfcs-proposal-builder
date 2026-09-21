@@ -34,8 +34,9 @@ export function buildNumber(l: Lineage): string {
   return l.seq > 0 ? `${l.baseNumber} Version ${versionLetter(l.seq)}` : l.baseNumber;
 }
 
-/** "Version B" — every proposal is a version, even when it's the only one. */
+/** "Version B", or "CO-2" for a change order. */
 export function familyLabel(p: Proposal): string {
+  if (p.kind === 'change_order') return `CO-${p.changeOrder?.number ?? 1}`;
   return `Version ${versionLetter(lineageOf(p).seq)}`;
 }
 
@@ -46,8 +47,35 @@ export function versionTitle(p: Proposal): string {
 }
 
 // unsaved versions and conflict copies don't exist yet as far as the list
-// (and numbering) is concerned
-const alive = (p: Proposal) => !p.deletedAt && !p.pendingVersion && !p.conflictOf;
+// (and numbering) is concerned; change orders are not versions at all
+const alive = (p: Proposal) =>
+  !p.deletedAt && !p.pendingVersion && !p.conflictOf && p.kind !== 'change_order';
+
+export const isChangeOrder = (p: Proposal) => p.kind === 'change_order';
+
+/** A contract's change orders, oldest first (unsaved ones excluded). */
+export function changeOrdersOf(all: Proposal[], contractId: string): Proposal[] {
+  return all
+    .filter((p) => p.changeOrder?.ofId === contractId && !p.deletedAt && !p.pendingVersion && !p.conflictOf)
+    .sort((a, b) => (a.changeOrder!.number ?? 0) - (b.changeOrder!.number ?? 0));
+}
+
+/** Signed change orders move the money; drafts are just paperwork so far. */
+export const isApproved = (p: Proposal) => p.status === 'accepted' || p.status === 'contract';
+
+export function nextChangeOrderNumber(all: Proposal[], contractId: string): number {
+  // unsaved drafts don't hold a number yet — otherwise the first change
+  // order would number itself CO-2 when it saves
+  const used = all
+    .filter((p) => p.changeOrder?.ofId === contractId && !p.deletedAt && !p.pendingVersion)
+    .map((p) => p.changeOrder!.number ?? 0);
+  return Math.max(0, ...used) + 1;
+}
+
+/** "CO-2" — what a change order is called everywhere. */
+export function changeOrderLabel(p: Proposal): string {
+  return `CO-${p.changeOrder?.number ?? 1}`;
+}
 
 /** Every version of this quote, oldest first. */
 export function familyOf(all: Proposal[], p: Proposal): Proposal[] {
@@ -91,6 +119,7 @@ export function lockReason(p: Proposal): LockReason {
 /** Link title the CRM shows: "Yoder Barndominium — Version B — 40x72". */
 export function linkTitle(p: Proposal): string {
   const name = p.project.referenceName || p.customer.fullName || p.proposalNumber;
+  if (p.kind === 'change_order') return `${name} — ${changeOrderLabel(p)}`;
   const l = lineageOf(p);
   return l.seq > 0 || p.versionName ? `${name} — ${versionTitle(p)}` : name;
 }

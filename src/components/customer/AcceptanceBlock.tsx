@@ -22,14 +22,26 @@ function SignatureColumn({ role }: { role: string }) {
  * Not a library card — cannot be toggled, removed, or reordered.
  * v1 workflow is print-and-sign; no digital signature capture by design.
  */
-export function AcceptanceBlock() {
+export function AcceptanceBlock({ changeOrderOf }: { changeOrderOf?: string } = {}) {
   return (
     <section className="acceptance-block mt-8">
-      <div className="section-banner">Acceptance</div>
+      <div className="section-banner">
+        {changeOrderOf ? 'Authorization to Proceed' : 'Acceptance'}
+      </div>
       <div className="border border-t-0 border-brand-gray-light bg-white p-5">
         <p className="text-sm leading-relaxed">
-          By signing below, the Owner accepts this proposal and authorizes Post-Frame
-          Construction Solutions, LLC to proceed to the contract phase of the project.
+          {changeOrderOf ? (
+            <>
+              By signing below, the Owner authorizes the work described on this change order and
+              accepts the amended contract total. All other terms of contract {changeOrderOf}
+              remain unchanged.
+            </>
+          ) : (
+            <>
+              By signing below, the Owner accepts this proposal and authorizes Post-Frame
+              Construction Solutions, LLC to proceed to the contract phase of the project.
+            </>
+          )}
         </p>
         <div className="mt-10 flex flex-col gap-10 sm:flex-row sm:gap-8 print:gap-8">
           <SignatureColumn role="Owner Signature" />

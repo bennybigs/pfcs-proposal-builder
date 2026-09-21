@@ -10,11 +10,13 @@ import { debouncedLocalStorage, STORAGE_KEYS } from '@/store/persistence';
 import { uuid } from '@/lib/uuid';
 import { lastName } from '@/lib/format';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { grandTotal } from '@/lib/pricing';
 import {
   buildNumber,
   familyOf,
   latestOf,
   lineageOf,
+  nextChangeOrderNumber,
   nextSeq,
 } from '@/lib/proposalFamily';
 
@@ -46,6 +48,8 @@ interface ProposalsState {
   /** Another option of the same quote, open side by side with the original. */
   /** An alternative version alongside this one, with a name of its own. */
   duplicateVersion: (id: string, name?: string) => Proposal | undefined;
+  /** A change order against a SIGNED contract: added/removed work priced on its own. */
+  createChangeOrder: (contractId: string) => Proposal | undefined;
   /** Save an unsaved revision/option: numbers it and applies it to its source. */
   saveVersion: (id: string) => Proposal | undefined;
   /** Throw away an unsaved revision/option. */
@@ -244,12 +248,54 @@ export const useProposalStore = create<ProposalsState>()(
           return copy;
         },
 
+        createChangeOrder: (contractId) => {
+          const all = get().proposals;
+          const contract = all[contractId];
+          if (!contract) return undefined;
+          // starts EMPTY — a change order lists only what's changing, never
+          // a copy of the contract. Customer, project and terms carry over.
+          const copy = cloneAsDraft(contract, {
+            kind: 'change_order',
+            cards: [],
+            intro: '',
+            // the proposal's disclaimers ("valid 14 days", "not itself a
+            // contract") are wrong on a change order — the sheet carries its
+            // own line about the contract's terms instead
+            disclaimers: '',
+            lineage: undefined,
+            versionName: undefined,
+            changeOrder: {
+              ofId: contract.id,
+              number: nextChangeOrderNumber(Object.values(all), contract.id),
+              contractNumber: contract.proposalNumber,
+              contractTotal: Math.round(grandTotal(contract) * 100) / 100,
+              contractSignedAt: contract.sentAt,
+            },
+            pendingVersion: { kind: 'change_order', sourceId: contract.id },
+          });
+          copy.proposalNumber = `${contract.proposalNumber} CO-${copy.changeOrder!.number}`;
+          set((s) => ({ proposals: { ...s.proposals, [copy.id]: copy } }));
+          return copy;
+        },
+
         saveVersion: (id) => {
           const all = get().proposals;
           const draft = all[id];
           if (!draft?.pendingVersion) return draft;
           const { kind, sourceId } = draft.pendingVersion;
           const source = all[sourceId];
+          // a change order isn't a version — it just gets its number settled
+          if (kind === 'change_order') {
+            const number = source ? nextChangeOrderNumber(Object.values(all), source.id) : draft.changeOrder?.number ?? 1;
+            const saved = touch({
+              ...draft,
+              changeOrder: { ...draft.changeOrder!, number },
+              proposalNumber: `${draft.changeOrder!.contractNumber} CO-${number}`,
+              pendingVersion: undefined,
+            });
+            set((s) => ({ proposals: { ...s.proposals, [id]: saved } }));
+            return saved;
+          }
           // the letter is settled at save, against what actually exists now
           const lineage = {
             ...lineageOf(draft),

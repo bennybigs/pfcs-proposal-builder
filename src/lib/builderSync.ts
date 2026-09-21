@@ -321,6 +321,37 @@ async function crmBookkeeping(sb: SupabaseClient, p: Proposal) {
       return;
     }
     const total = Math.round(grandTotal(p));
+    // A signed change order moves the job's value: contract as signed, plus
+    // every approved change order against it.
+    if (p.kind === 'change_order') {
+      const all = useProposalStore.getState().proposals;
+      const contract = all[p.changeOrder?.ofId ?? ''];
+      await sb.from('proposal_links').upsert(
+        { deal_id: dealId, proposal_id: p.id, title: linkTitle(p), total, linked_by: '' },
+        { onConflict: 'deal_id,proposal_id' }
+      );
+      if (contract) {
+        const { data: contractLink } = await sb
+          .from('proposal_links')
+          .select('counts_toward_value')
+          .eq('deal_id', dealId)
+          .eq('proposal_id', contract.id);
+        if (contractLink?.[0]?.counts_toward_value) {
+          const approved = Object.values(all).filter(
+            (q) =>
+              q.changeOrder?.ofId === contract.id &&
+              !q.deletedAt &&
+              !q.pendingVersion &&
+              (q.status === 'accepted' || q.status === 'contract')
+          );
+          const amended =
+            Math.round(grandTotal(contract)) +
+            approved.reduce((sum, q) => sum + Math.round(grandTotal(q)), 0);
+          await sb.from('deals').update({ value: amended }).eq('id', dealId);
+        }
+      }
+      return;
+    }
     const { data: rows } = await sb
       .from('proposal_links')
       .update({ total, title: linkTitle(p) })

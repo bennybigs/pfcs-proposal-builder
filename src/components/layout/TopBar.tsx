@@ -10,6 +10,7 @@ import {
   Eye,
   FileDown,
   FileJson,
+  FilePlus2,
   FileSpreadsheet,
   GitBranchPlus,
   Link2,
@@ -71,6 +72,9 @@ export function TopBar({
   onRevise,
   onAddOption,
   onCopyForCustomer,
+  onChangeOrder,
+  isChangeOrder,
+  canChangeOrder,
   guardLeave,
   crmControl,
 }: {
@@ -89,6 +93,11 @@ export function TopBar({
   onRevise: () => void;
   onAddOption: () => void;
   onCopyForCustomer: () => void;
+  /** Start a change order against this signed contract. */
+  onChangeOrder: () => void;
+  /** This document IS a change order — versions of it make no sense. */
+  isChangeOrder: boolean;
+  canChangeOrder: boolean;
   /** Unsaved revision/option: asks Save or Discard before leaving. */
   guardLeave?: (go: () => void) => void;
   crmControl?: React.ReactNode;
@@ -264,7 +273,15 @@ export function TopBar({
               <DropdownMenuItem onClick={onShare}><Link2 /> Copy share link</DropdownMenuItem>
               <DropdownMenuItem onClick={onExportPdf} disabled={pdfBusy}><FileDown /> Download PDF</DropdownMenuItem>
               <DropdownMenuSeparator />
-              {!unsaved && (
+              {!unsaved && canChangeOrder && (
+                <>
+                  <DropdownMenuItem onClick={onChangeOrder}>
+                    <FilePlus2 /> New change order
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {!unsaved && !isChangeOrder && (
                 <>
                   <DropdownMenuItem onClick={onRevise}><Copy /> Revise (keeps this version as sent)</DropdownMenuItem>
                   <DropdownMenuItem onClick={onAddOption}><GitBranchPlus /> Duplicate this version</DropdownMenuItem>
