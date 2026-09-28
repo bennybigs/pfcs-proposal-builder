@@ -1,16 +1,11 @@
-// The Standard Terms and Conditions attachment — rendered at the end of
-// EVERY proposal (customer share view, preview dialog, and PDF), per the
-// instrument itself: "attached to and forming part of every proposal issued
-// by Post Frame Construction Solutions, LLC." Includes the acceptance
-// signature grid and TWO copies of the Notice of Cancellation, as Ohio
-// R.C. 1345.23 requires two copies be furnished to the buyer.
+// The Standard Terms and Conditions attachment — rendered once a proposal
+// becomes a CONTRACT (accepted or signed), never on a working proposal:
+// a proposal is a price and a scope, the terms are the agreement.
+// The Notice of Cancellation is no longer printed here — it is its own
+// document (CancellationNotice.tsx), given to the buyer as required.
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  NOC_BODY_MD,
-  STANDARD_TERMS_MD,
-  TERMS_LETTERHEAD,
-} from '@/constants/standardTerms';
+import { STANDARD_TERMS_MD, TERMS_LETTERHEAD } from '@/constants/standardTerms';
 import type { CompanySnapshot } from '@/types';
 
 function SigLine({ label, wide }: { label: string; wide?: boolean }) {
@@ -18,30 +13,6 @@ function SigLine({ label, wide }: { label: string; wide?: boolean }) {
     <div className={wide ? 'mt-6' : 'mt-6 flex-1'}>
       <div className="border-b border-brand-black" style={{ height: '1.4rem' }} />
       <div className="mt-1 text-[10px] uppercase tracking-wide text-brand-steel">{label}</div>
-    </div>
-  );
-}
-
-function NoticeOfCancellation() {
-  return (
-    <div className="mt-6 border-t-2 border-dashed border-brand-steel pt-4" style={{ breakInside: 'avoid' }}>
-      <h3 className="text-center font-heading text-base font-bold uppercase tracking-wide">
-        Notice of Cancellation
-      </h3>
-      <p className="mt-2 text-xs">
-        Date of transaction: ____________________________
-      </p>
-      <div className="card-prose mt-2 text-xs [&_p]:my-1.5">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{NOC_BODY_MD}</ReactMarkdown>
-      </div>
-      <p className="mt-2 text-xs font-semibold">
-        NOT LATER THAN MIDNIGHT OF ____________________________ (date).
-      </p>
-      <p className="mt-3 text-xs font-bold uppercase">I hereby cancel this transaction.</p>
-      <div className="flex gap-8">
-        <SigLine label="Buyer's signature" />
-        <SigLine label="Date" />
-      </div>
     </div>
   );
 }
@@ -72,8 +43,7 @@ export function StandardTerms({ company }: { company: CompanySnapshot }) {
         Standard Terms and Conditions of Construction
       </h2>
       <p className="mt-1 text-center text-xs italic text-brand-steel">
-        Attached to and forming part of every proposal issued by Post Frame Construction
-        Solutions, LLC
+        Forming part of the contract between Post Frame Construction Solutions, LLC and the Owner
       </p>
 
       <div className="card-prose mt-4 text-xs [&_h2]:mt-4 [&_h2]:text-sm [&_li]:my-0.5 [&_p]:my-1.5">
@@ -92,8 +62,9 @@ export function StandardTerms({ company }: { company: CompanySnapshot }) {
           stated on the face of the Proposal.
         </p>
         <p className="mt-2 text-xs">
-          I acknowledge that I have received a completed copy of the Proposal and these Terms,
-          together with two copies of the Notice of Cancellation form, at the time I signed.
+          I acknowledge that I have received a completed copy of the Proposal and these Terms, and
+          — where the sale was made somewhere other than the Contractor&apos;s place of business —
+          two copies of the Notice of Cancellation form, at the time I signed.
         </p>
         <div className="mt-2 flex flex-wrap gap-10">
           <div className="min-w-[240px] flex-1">
@@ -119,13 +90,6 @@ export function StandardTerms({ company }: { company: CompanySnapshot }) {
         </div>
       </div>
 
-      {/* two copies, per the statute */}
-      <p className="mt-8 text-center text-[10px] uppercase tracking-wide text-brand-steel">
-        Two copies of this form must be given to the Owner at the time of signing. Detach along
-        the line.
-      </p>
-      <NoticeOfCancellation />
-      <NoticeOfCancellation />
     </section>
   );
 }

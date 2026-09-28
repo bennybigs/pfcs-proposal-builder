@@ -3,7 +3,7 @@
 // the things you can do along the top: Edit, Revise, Duplicate, Send.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, FilePlus2, Pencil, Plus, Printer, Send } from 'lucide-react';
+import { ArrowLeft, Copy, FilePlus2, Pencil, Plus, Printer, ScrollText, Send } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { CancellationNotice } from '@/components/customer/CancellationNotice';
 import { SendProposalDialog } from '@/components/editor/SendProposalDialog';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -62,8 +63,15 @@ export default function Versions() {
   const [duplicating, setDuplicating] = useState<Proposal | null>(null);
   const [name, setName] = useState('');
   const [sendOpen, setSendOpen] = useState(false);
+  const [nocOpen, setNocOpen] = useState(false);
 
   useEffect(() => setShowId(id), [id]);
+
+  // printing from the cancellation dialog must not also print the page behind it
+  useEffect(() => {
+    document.body.classList.toggle('sheet-dialog-open', nocOpen);
+    return () => document.body.classList.remove('sheet-dialog-open');
+  }, [nocOpen]);
 
   const shown = (showId && proposals[showId]) || opened;
 
@@ -165,8 +173,16 @@ export default function Versions() {
               <FilePlus2 className="h-4 w-4" /> Change order
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => window.print()} title="Print this sheet (or save it as a PDF)">
+          <Button size="sm" variant="outline" onClick={() => window.print()} title="Print what you're looking at (or save it as a PDF)">
             <Printer className="h-4 w-4" /> Print
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setNocOpen(true)}
+            title="Two copies on one sheet — required when a sale is signed anywhere but our office"
+          >
+            <ScrollText className="h-4 w-4" /> Cancellation notice
           </Button>
           <Button size="sm" onClick={() => setSendOpen(true)}>
             <Send className="h-4 w-4" /> Send…
@@ -284,7 +300,7 @@ export default function Versions() {
 
         {/* the proposal itself, exactly as the customer sees it */}
         <section className="min-w-0 flex-1">
-          <div className="light-scope print-sheet rounded-lg bg-brand-gray-bg p-2 sm:p-4">
+          <div className="light-scope print-page print-sheet rounded-lg bg-brand-gray-bg p-2 sm:p-4">
             <CustomerProposal proposal={shown} company={companySnapshot(settings)} />
           </div>
         </section>
@@ -299,6 +315,23 @@ export default function Versions() {
         onMailApp={() => undefined}
         afterSent={(url) => logProposalEvent(shown, 'share', url)}
       />
+
+      {/* Notice of Cancellation — its own sheet, printed when we choose to */}
+      <Dialog open={nocOpen} onOpenChange={setNocOpen}>
+        <DialogContent className="light-scope print-sheet max-h-[90vh] max-w-4xl overflow-y-auto bg-brand-gray-bg p-3 sm:p-6">
+          <DialogTitle className="sr-only">Notice of Cancellation</DialogTitle>
+          <div className="no-print mb-2 flex flex-wrap items-center gap-2 text-sm text-brand-steel">
+            <span className="min-w-0 flex-1">
+              Ohio requires two copies at signing when the sale happens anywhere other than our
+              office. Dated from {shown.sentAt ? 'the day this went out' : "today — fill the date in by hand if you're carrying blanks"}.
+            </span>
+            <Button size="sm" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> Print both copies
+            </Button>
+          </div>
+          <CancellationNotice proposal={shown} date={shown.sentAt ?? new Date().toISOString()} />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!duplicating} onOpenChange={(o) => !o && setDuplicating(null)}>
         <DialogContent className="max-w-md">

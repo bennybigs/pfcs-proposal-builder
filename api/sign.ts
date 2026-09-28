@@ -14,6 +14,7 @@ interface SignBody {
   proposalId?: string;
   appOrigin?: string;
   proposalNumber?: string;
+  documentKind?: string;
   projectName?: string;
   customerName?: string;
   total?: string;
@@ -88,6 +89,10 @@ export default async function handler(req: any, res: any) {
   const documentUrl = typeof body.documentUrl === 'string' ? body.documentUrl.slice(0, 16000) : '';
   const proposalId = clean(body.proposalId).replace(/[^a-zA-Z0-9-]/g, '');
   const appOrigin = clean(body.appOrigin);
+  // 'terms' = the second signature, taken after the customer accepts and the
+  // Standard Terms are shown to them
+  const docKind = clean(body.documentKind) === 'terms' ? 'terms' : 'proposal';
+  const docLabel = docKind === 'terms' ? 'Standard Terms and Conditions' : 'Proposal';
 
   if (!signerName || !notifyEmail || body.consent !== true) {
     res.status(400).json({ error: 'missing-fields' });
@@ -134,7 +139,7 @@ export default async function handler(req: any, res: any) {
   // mark-as-contract link). The signer's copy omits both.
   const buildText = (internal: boolean) =>
     [
-      `Proposal:      ${proposalNumber} — ${projectName}`,
+      `${docLabel === 'Proposal' ? 'Proposal:     ' : 'Document:     '} ${proposalNumber} — ${projectName}${docKind === 'terms' ? ' (Terms and Conditions)' : ''}`,
       `Customer:      ${customerName}`,
       `Total:         ${total}`,
       ``,
@@ -210,8 +215,10 @@ export default async function handler(req: any, res: any) {
         From: fromEmail,
         To: to,
         Subject: isSignerCopy
-          ? `Your signed copy — Proposal ${proposalNumber} (${projectName})`
-          : `Proposal ${proposalNumber} accepted by ${signerName}`,
+          ? `Your signed copy — ${docLabel} ${proposalNumber} (${projectName})`
+          : docKind === 'terms'
+            ? `Terms accepted by ${signerName} — ${proposalNumber}`
+            : `Proposal ${proposalNumber} accepted by ${signerName}`,
         TextBody: buildText(!isSignerCopy),
         HtmlBody: buildHtml(!isSignerCopy),
         MessageStream: 'outbound',

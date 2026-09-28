@@ -43,6 +43,7 @@ export function CustomerProposal({
   // is being added or taken off the signed contract, the difference in price
   // (which can be a credit), and the amended contract total.
   const co = proposal.kind === 'change_order' ? proposal.changeOrder : undefined;
+  const isContract = proposal.status === 'contract' || proposal.status === 'accepted';
   const amendedTotal = co ? co.contractTotal + total : total;
   const visibleCards = proposal.cards.filter((c) => c.isEnabled);
   const showTotal = proposal.showGrandTotalToCustomer;
@@ -57,6 +58,16 @@ export function CustomerProposal({
           {company.logoUrl && (
             <img src={company.logoUrl} alt={company.companyName} className="h-24 max-w-[400px] object-contain" />
           )}
+          {/* who this is from — on the face of the document, not just the footer */}
+          <div className="text-xs leading-relaxed text-brand-steel">
+            <div className="font-heading text-sm font-bold uppercase tracking-wide text-brand-black">
+              {company.companyName}
+            </div>
+            {company.address && <div>{company.address}</div>}
+            {(company.phone || company.email) && (
+              <div>{[company.phone, company.email].filter(Boolean).join(' · ')}</div>
+            )}
+          </div>
         </div>
         <div className="text-left sm:text-right">
           <div className="font-heading text-2xl font-bold uppercase tracking-wide">
@@ -240,18 +251,18 @@ export function CustomerProposal({
       {/* Acceptance — always follows the body, never removable */}
       <AcceptanceBlock changeOrderOf={co?.contractNumber} />
 
-      {/* Standard Terms: on a proposal they're the agreement; on a change
-          order the signed contract's terms already govern, so this sheet
-          says so rather than restating them. */}
+      {/* Terms attach when it BECOMES a contract — a proposal is a price and
+          a scope, not an agreement. A change order rides on the contract's
+          terms, so it says so rather than restating them. */}
       {co ? (
         <p className="mt-6 text-xs leading-relaxed text-brand-steel">
           All terms and conditions of contract {co.contractNumber} remain in force and apply to
           this change order. Work described here is authorized only when this sheet is signed by
           both parties.
         </p>
-      ) : (
+      ) : isContract ? (
         <StandardTerms company={company} />
-      )}
+      ) : null}
 
       <footer className="mt-8 border-t border-brand-gray-light pt-4 text-center text-xs text-brand-steel">
         {company.companyName}

@@ -1,19 +1,27 @@
 import LZString from 'lz-string';
+import { TERMS_LETTERHEAD } from '@/constants/standardTerms';
 import type { CompanySettings, CompanySnapshot, Proposal, SharePayload } from '@/types';
 
 /** Data-URL logos beyond this size are omitted from share links to keep URLs practical. */
 export const MAX_EMBEDDED_LOGO_CHARS = 80_000;
 
+/**
+ * Company details as they appear on the customer's document. Settings win;
+ * where Settings is blank (or the address has no street number), the company
+ * record on the legal letterhead fills the gap so a customer is never handed
+ * a document that can't tell them where we are.
+ */
 export function companySnapshot(settings: CompanySettings): CompanySnapshot {
-  const { companyName, tagline, address, phone, email, logoUrl } = settings;
+  const { companyName, tagline, phone, email, logoUrl } = settings;
+  const address = /\d/.test(settings.address ?? '') ? settings.address : TERMS_LETTERHEAD.address.replace(/\s·\s/g, ', ');
   const embedLogo =
     !logoUrl.startsWith('data:') || logoUrl.length <= MAX_EMBEDDED_LOGO_CHARS;
   return {
     companyName,
     tagline,
     address,
-    phone,
-    email,
+    phone: phone?.trim() || TERMS_LETTERHEAD.phone,
+    email: email?.trim() || TERMS_LETTERHEAD.email,
     logoUrl: embedLogo ? logoUrl : undefined,
   };
 }

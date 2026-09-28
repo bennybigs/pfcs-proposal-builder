@@ -78,6 +78,12 @@
     display: none !important;
   }
 
+  /* When a sheet is open in a dialog (the cancellation notice), the page
+     behind it must not print as well. */
+  body.sheet-dialog-open .print-page {
+    display: none !important;
+  }
+
   /* The sheet prints alone: no app background, no rounded card around it. */
   .print-sheet {
     background: white !important;

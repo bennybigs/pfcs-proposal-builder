@@ -229,7 +229,7 @@ This agreement is governed by the law of the State of Ohio, without regard to it
 
 ## 25. Your Right to Cancel
 
-YOU, THE BUYER, MAY CANCEL THIS TRANSACTION AT ANY TIME PRIOR TO MIDNIGHT OF THE THIRD BUSINESS DAY AFTER THE DATE OF THIS TRANSACTION. SEE THE ATTACHED NOTICE OF CANCELLATION FORM FOR AN EXPLANATION OF THIS RIGHT.
+YOU, THE BUYER, MAY CANCEL THIS TRANSACTION AT ANY TIME PRIOR TO MIDNIGHT OF THE THIRD BUSINESS DAY AFTER THE DATE OF THIS TRANSACTION. SEE THE NOTICE OF CANCELLATION FORM PROVIDED WITH THIS AGREEMENT FOR AN EXPLANATION OF THIS RIGHT.
 
 This right applies where the Proposal is signed at your residence or at any place other than our regular place of business, as provided by Ohio Revised Code Sections 1345.21 through 1345.28. If you cancel within that period, any payment you have made will be returned within ten (10) business days and no charge of any kind applies. We will not order material, schedule crews, or begin Work during the cancellation period unless you request in writing that we start sooner.
 
