@@ -1,6 +1,6 @@
 // /crm/leads — the triage inbox, now a filtered view of THE pipeline itself:
 // every row is the same card (same deal ID) that runs Lead → Won. No
-// promotion, no conversion — Advance simply moves the card to Follow Up.
+// promotion, no conversion — a connected call simply moves the card to Contacted.
 // On Hold is an overlay (stage stays, clock pauses until the callback date);
 // Lost requires a reason. Admin territory — reps live in My Leads.
 // All row actions are the SHARED CardActions components — identical code

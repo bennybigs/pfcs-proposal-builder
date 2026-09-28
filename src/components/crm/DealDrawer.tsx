@@ -57,6 +57,7 @@ import {
   logSystem,
   updateActivity,
   deleteActivity,
+  logActivity,
 } from '@/lib/crm/api/activities';
 import { useTeam, memberName } from '@/lib/crm/api/team';
 import { useSessionEmail } from '@/lib/crm/session';
@@ -87,6 +88,7 @@ import {
   SOURCE_LABEL,
   STAGES,
   STAGE_META,
+  undoMinutesLeft,
   formatDollars,
   type Activity,
   type Contact,
@@ -891,6 +893,14 @@ function Timeline({
   const [filter, setFilter] = useState<TimelineFilter>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [correcting, setCorrecting] = useState<Activity | null>(null);
+  const [correction, setCorrection] = useState('');
+  // re-render each minute so the "delete for N more min" countdown is honest
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const visible = useMemo(() => {
     return activities.filter((a) => {
@@ -915,7 +925,30 @@ function Timeline({
       await deleteActivity(id);
       onChanged();
     } catch (err) {
-      toast.error('Could not delete', err instanceof Error ? err.message : String(err));
+      toast.error(
+        'Could not delete',
+        'A note can only be deleted by the person who wrote it, within ten minutes.'
+      );
+      void err;
+    }
+  };
+
+  /** System entries are the record — a correction is added beneath, never over. */
+  const saveCorrection = async () => {
+    if (!correcting || !correction.trim()) return;
+    try {
+      await logActivity({
+        contact_id: correcting.contact_id,
+        deal_id: correcting.deal_id,
+        type: 'note',
+        body: `Correction to "${correcting.body.slice(0, 80)}${correcting.body.length > 80 ? '…' : ''}" — ${correction.trim()}`,
+        source: 'manual',
+      });
+      setCorrecting(null);
+      setCorrection('');
+      onChanged();
+    } catch (err) {
+      toast.error('Could not add the correction', err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -951,6 +984,7 @@ function Timeline({
         <div className="mt-2">
           {visible.map((a) => {
             const mine = a.source === 'manual' && a.logged_by === me;
+            const minutesLeft = mine ? undoMinutesLeft(a) : 0;
             return (
               <div key={a.id} className="group border-b py-2 text-sm last:border-b-0">
                 {editingId === a.id ? (
@@ -971,26 +1005,63 @@ function Timeline({
                         {ACTIVITY_META[a.type]?.label ?? a.type}
                       </span>
                       <div className="min-w-0 flex-1 whitespace-pre-wrap text-brand-black">{a.body}</div>
-                      {mine && (
-                        <span className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100">
+                      <span className="flex shrink-0 items-center gap-2 text-[11px]">
+                        {mine && (
                           <button
-                            className="p-0.5 text-brand-steel hover:text-brand-orange"
+                            className="font-medium text-brand-steel hover:text-brand-orange"
                             onClick={() => { setEditingId(a.id); setEditText(a.body); }}
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="mr-0.5 inline h-3 w-3" /> Edit
                           </button>
-                          <button className="p-0.5 text-brand-steel hover:text-red-600" onClick={() => remove(a.id)}>
-                            <Trash2 className="h-3 w-3" />
+                        )}
+                        {mine && minutesLeft > 0 && (
+                          <button
+                            className="font-medium text-brand-steel hover:text-red-600"
+                            title={`You can delete your own note for ${minutesLeft} more minute${minutesLeft === 1 ? '' : 's'}`}
+                            onClick={() => remove(a.id)}
+                          >
+                            <Trash2 className="mr-0.5 inline h-3 w-3" /> Delete ({minutesLeft}m)
                           </button>
-                        </span>
-                      )}
+                        )}
+                        {!mine && a.source !== 'manual' && (
+                          <button
+                            className="font-medium text-brand-steel hover:text-brand-orange"
+                            title="This entry is the record and can't be changed — add a correction underneath it"
+                            onClick={() => { setCorrecting(a); setCorrection(''); }}
+                          >
+                            Correct
+                          </button>
+                        )}
+                      </span>
                     </div>
                     <div className="mt-0.5 pl-1 text-[11px] text-brand-steel">
                       {a.outcome && <span className="mr-2 font-medium">{a.outcome.replace('_', ' ')}</span>}
                       {a.duration_min != null && <span className="mr-2">{a.duration_min} min</span>}
                       {a.logged_by} · {formatDateUS(a.happened_at)}
-                      {a.edited_at && ' · edited'}
+                      {a.edited_at && ` · edited ${formatDateUS(a.edited_at)}`}
                     </div>
+                    {correcting?.id === a.id && (
+                      <div className="mt-2 grid gap-2 rounded-md border border-brand-orange/40 bg-brand-orange/5 p-2">
+                        <p className="text-[11px] text-brand-steel">
+                          This entry stays as written — your correction is added below it.
+                        </p>
+                        <Textarea
+                          rows={2}
+                          autoFocus
+                          value={correction}
+                          placeholder="What actually happened"
+                          onChange={(e) => setCorrection(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" className="h-7" onClick={() => setCorrecting(null)}>
+                            Cancel
+                          </Button>
+                          <Button size="sm" className="h-7" disabled={!correction.trim()} onClick={() => void saveCorrection()}>
+                            Add correction
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

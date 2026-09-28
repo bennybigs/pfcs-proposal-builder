@@ -1007,3 +1007,28 @@ end $$;
 drop trigger if exists team_members_guard_role on public.team_members;
 create trigger team_members_guard_role before update on public.team_members
   for each row execute function public.guard_role_change();
+
+-- ── timeline: a short window to take something back ────────────────────
+-- happened_at is when the call happened (it can be backdated), so the
+-- undo window needs its own clock: when the entry was actually written.
+alter table public.activities add column if not exists created_at timestamptz not null default now();
+update public.activities set created_at = happened_at where created_at > happened_at;
+
+/** Ten minutes to delete your own note — after that the record stands. */
+create or replace function public.within_undo_window(ts timestamptz) returns boolean
+language sql stable as $$
+  select ts > now() - interval '10 minutes';
+$$;
+
+-- Your own typed notes: editable (always stamped "edited"), deletable only
+-- inside the window. Entries the system wrote — stage changes, inbound
+-- leads, proposal sends — are the audit trail and are never touched.
+drop policy if exists "role delete" on public.activities;
+create policy "role delete" on public.activities for delete
+  using (
+    public.can_write()
+    and public.can_see_contact(contact_id)
+    and source = 'manual'
+    and logged_by = auth.email()
+    and public.within_undo_window(created_at)
+  );

@@ -176,6 +176,19 @@ export interface Activity {
   outcome: string | null;      // CallOutcome for calls
   duration_min: number | null;
   edited_at: string | null;
+  /** When the entry was written (happened_at can be backdated) — drives the
+   *  ten-minute window in which you can still take your own note back. */
+  created_at?: string;
+}
+
+/** How long a note can be deleted by the person who wrote it. */
+export const UNDO_WINDOW_MS = 10 * 60 * 1000;
+
+/** Minutes left to delete this entry, or 0 once the window has closed. */
+export function undoMinutesLeft(a: { created_at?: string; happened_at: string }, now = Date.now()): number {
+  const written = Date.parse(a.created_at ?? a.happened_at);
+  if (!Number.isFinite(written)) return 0;
+  return Math.max(0, Math.ceil((written + UNDO_WINDOW_MS - now) / 60000));
 }
 
 export interface Task {
@@ -219,7 +232,7 @@ export const STAGES: DealStage[] = [
 
 export const STAGE_META: Record<DealStage, { label: string; probability: number; color: string }> = {
   lead: { label: 'Lead', probability: 5, color: 'bg-red-100 text-red-700' },
-  follow_up: { label: 'Follow Up', probability: 15, color: 'bg-orange-100 text-orange-700' },
+  follow_up: { label: 'Contacted', probability: 15, color: 'bg-orange-100 text-orange-700' },
   site_visit: { label: 'Site Visit', probability: 25, color: 'bg-sky-100 text-sky-700' },
   estimate: { label: 'Estimate', probability: 40, color: 'bg-violet-100 text-violet-700' },
   proposal_sent: { label: 'Proposal Sent', probability: 50, color: 'bg-amber-100 text-amber-700' },

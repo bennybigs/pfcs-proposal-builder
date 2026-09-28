@@ -5,7 +5,7 @@
 //   StageChipControl — tap the stage chip, pick any stage; Won/Lost separated
 //                      behind confirms (Won asks final value; Lost a reason)
 //   LogButton        — log a call / text / note without opening anything;
-//                      connected call on a Lead offers "move to Follow Up";
+//                      connected call on a Lead offers "move to Contacted";
 //                      bad number / wrong person offers an inline phone fix
 //   AssigneePicker   — admin select / read-only name
 //   HoldDialog, LostDialog, WonDialog — shared everywhere
@@ -302,7 +302,7 @@ function LogDialog({
       qc.invalidateQueries({ queryKey: ['activities'] });
       toast.success(
         type === 'note' ? 'Note added' : `${type === 'call' ? 'Call' : 'Text'} logged`,
-        moveOn && deal.stage === 'lead' ? 'Moved to Follow Up.' : followUp ? 'Follow-up task created.' : undefined
+        moveOn && deal.stage === 'lead' ? 'Moved to Contacted.' : followUp ? 'Follow-up task created.' : undefined
       );
       onOpenChange(false);
     } catch (err) {
@@ -412,7 +412,7 @@ function LogDialog({
                 onChange={(e) => setMoveOn(e.target.checked)}
                 className="h-4 w-4 accent-brand-orange"
               />
-              Move to Follow Up
+              Move to Contacted
             </label>
           )}
         </div>
