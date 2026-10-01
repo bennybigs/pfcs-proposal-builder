@@ -64,6 +64,8 @@ export interface Proposal {
   versionName?: string;
   /** When this version first went to the customer. */
   sentAt?: string;
+  /** The day it became the contract — stamped by Convert to Contract. */
+  signedAt?: string;
   /**
    * The number is provisional (made on this device) until the team-wide
    * counter confirms it on the next sync. Only drafts are ever renumbered.

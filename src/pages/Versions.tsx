@@ -3,7 +3,7 @@
 // the things you can do along the top: Edit, Revise, Duplicate, Send.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, FilePlus2, Pencil, Plus, Printer, ScrollText, Send } from 'lucide-react';
+import { ArrowLeft, Copy, FileSignature, FilePlus2, Pencil, Plus, Printer, ScrollText, Send } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
 import { CancellationNotice } from '@/components/customer/CancellationNotice';
 import { SendProposalDialog } from '@/components/editor/SendProposalDialog';
+import { toast } from '@/components/ui/toast';
 import { useProposalStore } from '@/store/useProposalStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { createVersion } from '@/lib/crm/integration/versions';
@@ -64,6 +65,8 @@ export default function Versions() {
   const [name, setName] = useState('');
   const [sendOpen, setSendOpen] = useState(false);
   const [nocOpen, setNocOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const updateProposal = useProposalStore((s) => s.updateProposal);
 
   useEffect(() => setShowId(id), [id]);
 
@@ -168,6 +171,11 @@ export default function Versions() {
           >
             <Copy className="h-4 w-4" /> Duplicate → Version {nextLetter}
           </Button>
+          {!viewingCo && !closed && !isApproved(shown) && (
+            <Button size="sm" variant="outline" onClick={() => setConvertOpen(true)}>
+              <FileSignature className="h-4 w-4" /> Convert to contract
+            </Button>
+          )}
           {signed && (
             <Button size="sm" variant="outline" onClick={newChangeOrder}>
               <FilePlus2 className="h-4 w-4" /> Change order
@@ -315,6 +323,42 @@ export default function Versions() {
         onMailApp={() => undefined}
         afterSent={(url) => logProposalEvent(shown, 'share', url)}
       />
+
+      {/* Convert to contract — what changes is spelled out before it happens */}
+      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert {familyLabel(shown)} to the contract?</DialogTitle>
+            <DialogDescription>
+              Use this when the customer has accepted — signed the printed copy, or told you yes.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="grid gap-1.5 text-sm text-brand-steel">
+            <li>• The Standard Terms and Conditions attach to the document.</li>
+            <li>• Signature lines appear for both parties.</li>
+            <li>• Change orders become available against it.</li>
+            <li>• Today&apos;s date is recorded as the contract date.</li>
+          </ul>
+          <p className="text-xs text-brand-steel">
+            Nothing is sent to the customer. You can set it back to Sent from the editor if you
+            convert one by mistake.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                updateProposal(shown.id, { status: 'contract' });
+                setConvertOpen(false);
+                toast.success(`${shown.proposalNumber} is now the contract`, 'Terms and signature lines are attached. Print it, or start a change order.');
+              }}
+            >
+              <FileSignature className="h-4 w-4" /> Convert to contract
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Notice of Cancellation — its own sheet, printed when we choose to */}
       <Dialog open={nocOpen} onOpenChange={setNocOpen}>

@@ -71,7 +71,7 @@ export function CustomerProposal({
         </div>
         <div className="text-left sm:text-right">
           <div className="font-heading text-2xl font-bold uppercase tracking-wide">
-            {co ? `Change Order ${proposal.changeOrder?.number ?? ''}` : 'Proposal'}
+            {co ? `Change Order ${proposal.changeOrder?.number ?? ''}` : isContract ? 'Contract' : 'Proposal'}
           </div>
           <div className="text-sm text-brand-steel">{proposal.proposalNumber}</div>
           <div className="text-sm text-brand-steel">{formatDateLong(proposal.createdAt)}</div>
@@ -79,6 +79,11 @@ export function CustomerProposal({
             <div className="text-xs text-brand-steel">
               To contract <span className="font-semibold">{co.contractNumber}</span>
               {co.contractSignedAt ? ` signed ${formatDateLong(co.contractSignedAt)}` : ''}
+            </div>
+          ) : isContract ? (
+            // an accepted price is no longer an offer with an expiry
+            <div className="text-xs text-brand-steel">
+              Contract date {formatDateLong(proposal.signedAt ?? proposal.sentAt ?? proposal.createdAt)}
             </div>
           ) : (
             <div className="text-xs italic text-brand-steel">
@@ -248,8 +253,10 @@ export function CustomerProposal({
         </div>
       )}
 
-      {/* Acceptance — always follows the body, never removable */}
-      <AcceptanceBlock changeOrderOf={co?.contractNumber} />
+      {/* Signature lines belong on the things that get signed: the contract
+          and change orders. A proposal is a price and a scope — it carries
+          no sign-off, so nothing can be signed before the terms exist. */}
+      {(isContract || co) && <AcceptanceBlock changeOrderOf={co?.contractNumber} />}
 
       {/* Terms attach when it BECOMES a contract — a proposal is a price and
           a scope, not an agreement. A change order rides on the contract's

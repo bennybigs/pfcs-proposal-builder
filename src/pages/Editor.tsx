@@ -181,6 +181,11 @@ export default function Editor() {
 
   // ── unsaved revision / option ──
   const pending = proposal.pendingVersion;
+  // contracts and change orders get signed; a working proposal does not
+  const signable =
+    proposal.kind === 'change_order' ||
+    proposal.status === 'contract' ||
+    proposal.status === 'accepted';
   const pendingSource = pending ? allProposals[pending.sourceId] : undefined;
   const doSave = () => saveVersion(proposal.id);
   const doDiscard = (then?: () => void) => {
@@ -529,15 +534,24 @@ export default function Editor() {
               </div>
               </div>
 
-              {/* Fixed acceptance block preview — not editable, not removable */}
-              <div className="relative">
-                <div className="pointer-events-none opacity-80">
-                  <AcceptanceBlock />
+              {/* Signature lines appear once this is signed work — on a
+                  proposal there is nothing to sign yet */}
+              {signable ? (
+                <div className="relative">
+                  <div className="pointer-events-none opacity-80">
+                    <AcceptanceBlock changeOrderOf={proposal.changeOrder?.contractNumber} />
+                  </div>
+                  <p className="mt-1 text-center text-xs italic text-brand-steel">
+                    This signature section is fixed and always appears last.
+                  </p>
                 </div>
-                <p className="mt-1 text-center text-xs italic text-brand-steel">
-                  The Acceptance section is fixed and always appears last on every proposal.
+              ) : (
+                <p className="rounded-lg border-2 border-dashed border-brand-gray-light bg-white p-4 text-center text-xs italic text-brand-steel">
+                  No signature lines on a proposal — they appear with the Standard Terms once it is
+                  marked Accepted or Contract. The customer can still accept it electronically from
+                  the shared link.
                 </p>
-              </div>
+              )}
 
               {/* Electronic signing preview — the live button exists on the shared link */}
               {proposal.salesRepEmail?.trim() || settings.email?.trim() ? (

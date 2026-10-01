@@ -144,7 +144,7 @@ export default function Dashboard() {
                     <DropdownMenuItem
                       onClick={() => updateProposal(p.id, { status: 'contract' })}
                     >
-                      <FileSignature /> Mark as Contract
+                      <FileSignature /> Convert to contract
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onClick={() => openVersion('revision')}>

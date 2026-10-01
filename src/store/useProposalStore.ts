@@ -155,6 +155,10 @@ export const useProposalStore = create<ProposalsState>()(
             ...(patch.status && patch.status !== 'draft' && !p.sentAt
               ? { sentAt: new Date().toISOString() }
               : {}),
+            // the day it became the contract, recorded once
+            ...((patch.status === 'contract' || patch.status === 'accepted') && !p.signedAt
+              ? { signedAt: new Date().toISOString() }
+              : {}),
           }));
           // signing one version settles the others: they become "not chosen"
           // (still kept, still in the list). Reopening one by hand clears it.
@@ -269,7 +273,7 @@ export const useProposalStore = create<ProposalsState>()(
               number: nextChangeOrderNumber(Object.values(all), contract.id),
               contractNumber: contract.proposalNumber,
               contractTotal: Math.round(grandTotal(contract) * 100) / 100,
-              contractSignedAt: contract.sentAt,
+              contractSignedAt: contract.signedAt ?? contract.sentAt,
             },
             pendingVersion: { kind: 'change_order', sourceId: contract.id },
           });
