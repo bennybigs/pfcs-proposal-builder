@@ -329,7 +329,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
   return (
     <Sheet open={!!deal} onOpenChange={(o) => !o && requestClose()}>
-      <SheetContent className="w-full overflow-y-auto bg-brand-gray-bg pb-24 sm:max-w-md">
+      <SheetContent className="drawer-canvas w-full overflow-y-auto pb-24 sm:max-w-md">
         <SheetHeader>
           <div className="flex items-start gap-2 pr-8">
             <SheetTitle className="min-w-0 flex-1">{draft.title || deal.title}</SheetTitle>

@@ -20,7 +20,7 @@
     --accent-foreground: 0 0% 10%;
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 91%;
+    --border: 0 0% 72%; /* cards and dividers you can actually see */
     --input: 0 0% 85%;
     --ring: 37 90% 48%;
     --radius: 0.5rem;
@@ -68,13 +68,31 @@
   font-family: theme('fontFamily.body') !important;
 }
 
-/* Section cards in the job drawer: the default border (#E8E8E8) disappears
-   against a near-white page, so panels get an edge you can actually see. */
+/* Cards across the whole app get a 2px edge — a hairline disappears against
+   a near-white page. Rows and small chips keep 1px; the darker --border
+   token above makes those legible on their own. */
+.rounded-lg.border.bg-white,
+.rounded-lg.border.bg-card,
+.rounded-lg.border.bg-brand-gray-bg,
+.rounded-lg.border.bg-gray-100,
 .panel-edge {
+  border-width: 2px;
   border-color: rgba(90, 90, 90, 0.38);
 }
+.dark .rounded-lg.border.bg-white,
+.dark .rounded-lg.border.bg-card,
+.dark .rounded-lg.border.bg-brand-gray-bg,
+.dark .rounded-lg.border.bg-gray-100,
 .dark .panel-edge {
   border-color: #3f3f49;
+}
+
+/* The drawer canvas sits a shade below the cards so they lift off it. */
+.drawer-canvas {
+  background-color: #e7e7ea;
+}
+.dark .drawer-canvas {
+  background-color: #0a0a0d;
 }
 
 /* ---------- Print styles (customer view / PDF) ---------- */
@@ -146,7 +164,7 @@
   --secondary-foreground: 240 5% 92%;
   --muted: 240 4% 14%;
   --muted-foreground: 240 4% 62%;
-  --border: 240 4% 19%;
+  --border: 240 5% 30%;
   --input: 240 4% 24%;
 }
 
