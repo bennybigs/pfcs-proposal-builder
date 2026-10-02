@@ -295,7 +295,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
   /**
    * One checkbox replaces the old "use this total" / "refresh" pair: the
-   * chosen proposal's total IS the deal value from now on, and builderSync
+   * chosen proposal's total IS the job value from now on, and builderSync
    * keeps it current on every edit. A deal has one value, so checking one
    * clears the others.
    */
@@ -317,7 +317,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ['proposal_links'] });
       qc.invalidateQueries({ queryKey: ['deals'] });
       toast.success(
-        on ? 'Deal value follows this proposal' : 'Deal value is manual again',
+        on ? 'Job value follows this proposal' : 'Job value is manual again',
         on ? 'It updates itself whenever the proposal changes.' : undefined
       );
     } catch (err) {
@@ -501,7 +501,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             </Select>
           </Field>
 
-          <SectionLabel>Deal</SectionLabel>
+          <SectionLabel>Job</SectionLabel>
           <Field label="Title">
             <Input value={draft.title} onChange={(e) => set({ title: e.target.value })} />
           </Field>
@@ -548,7 +548,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             )}
             {deal.closed_by && (
               <p className="text-xs text-brand-steel">
-                Closed by {memberName(team, deal.closed_by)} — locked in when the deal was won.
+                Closed by {memberName(team, deal.closed_by)} — locked in when the job was won.
               </p>
             )}
           </Field>
@@ -586,7 +586,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 const closed = Boolean(local?.supersededBy || local?.notChosen);
                 const sent = local ? lockReason(local) === 'sent' : false;
                 const openVersion = (kind: 'revision' | 'duplicate') => {
-                  // opens an unsaved copy — the deal only changes when it's saved
+                  // opens an unsaved copy — the job only changes when it's saved
                   const copy = createVersion(pl.proposal_id, kind);
                   if (copy)
                     navigate(`/proposal/${copy.id}`, {
@@ -635,7 +635,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                         checked={pl.counts_toward_value}
                         onChange={(e) => void setDealValueSource(pl, total, e.target.checked)}
                       />
-                      Counts as the deal value
+                      Counts as the job value
                       {pl.counts_toward_value && (
                         <span className="text-brand-steel">— updates itself when you edit</span>
                       )}

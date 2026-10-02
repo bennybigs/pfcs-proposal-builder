@@ -63,7 +63,7 @@ export function NotificationBell() {
           )}
         </div>
         {items.length === 0 ? (
-          <p className="px-2 pb-2 text-sm text-brand-steel">Nothing yet — you&apos;ll see deal assignments and inbound leads here.</p>
+          <p className="px-2 pb-2 text-sm text-brand-steel">Nothing yet — you&apos;ll see job assignments and inbound leads here.</p>
         ) : (
           items.map((n) => (
             <DropdownMenuItem

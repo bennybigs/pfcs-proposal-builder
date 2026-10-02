@@ -2,7 +2,7 @@
 // range: headline numbers, won $ by referral source (with campaign
 // drill-down), leads by source, by segment, monthly trend, and stage counts
 // over time from deal_stage_history. Segment filter applies everywhere.
-// Archived contacts' deals are excluded, matching the pipeline's numbers.
+// Archived contacts' jobs are excluded, matching the pipeline's numbers.
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Download } from 'lucide-react';
@@ -222,7 +222,7 @@ export default function Reports() {
         ['leads created', String(created.length)],
         ['deals won', String(won.length)],
         ['won value', String(wonValue)],
-        ['average won deal', String(won.length ? Math.round(wonValue / won.length) : 0)],
+        ['average won job', String(won.length ? Math.round(wonValue / won.length) : 0)],
         ['win rate %', winRate === null ? '' : String(winRate)],
       ]
     )],
@@ -322,9 +322,9 @@ export default function Reports() {
       {/* 1 · headline */}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Stat label="Leads created" value={String(created.length)} />
-        <Stat label="Deals won" value={String(won.length)} />
+        <Stat label="Jobs won" value={String(won.length)} />
         <Stat label="Won value" value={formatDollars(wonValue)} accent />
-        <Stat label="Avg won deal" value={won.length ? formatDollars(wonValue / won.length) : '—'} />
+        <Stat label="Avg won job" value={won.length ? formatDollars(wonValue / won.length) : '—'} />
         <Stat label="Win rate (closed in period)" value={winRate === null ? '—' : `${winRate}%`} />
       </div>
 
@@ -334,7 +334,7 @@ export default function Reports() {
         onExport={() => download(`pfcs-report-${rangeSlug}-won-by-source.csv`, csvSections()[1][1])}
       >
         {wonBySource.length === 0 ? (
-          <Empty text="No deals won in this period yet." />
+          <Empty text="No jobs won in this period yet." />
         ) : (
           <WonBySourceTable rows={wonBySource} total={wonValue} />
         )}
@@ -408,11 +408,11 @@ export default function Reports() {
       {/* 4b · by rep */}
       <Section
         title="By rep"
-        note="Won figures credit the rep who held the deal when it was won (locked at close). Gross sale value only — commission eligibility depends on the margin condition in job costing, not the CRM."
+        note="Won figures credit the rep who held the job when it was won (locked at close). Gross sale value only — commission eligibility depends on the margin condition in job costing, not the CRM."
         onExport={() => download(`pfcs-report-${rangeSlug}-by-rep.csv`, csvSections()[4][1])}
       >
         {byRep.length === 0 ? (
-          <Empty text="No assigned deals in this period yet." />
+          <Empty text="No assigned jobs in this period yet." />
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -473,7 +473,7 @@ export default function Reports() {
       {/* 6 · stage counts over time + snapshot */}
       <Section
         title="Stage entries per month"
-        note="How many deals ENTERED each stage that month (from stage history)."
+        note="How many jobs ENTERED each stage that month (from stage history)."
         onExport={() => download(`pfcs-report-${rangeSlug}-stages.csv`, csvSections()[6][1])}
       >
         <div className="overflow-x-auto">

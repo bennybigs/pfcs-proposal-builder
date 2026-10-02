@@ -32,6 +32,10 @@ import { toast } from '@/components/ui/toast';
 import { ContactDialog } from '@/components/crm/ContactDialog';
 import { ContactFiles } from '@/components/crm/ContactFiles';
 import { NewProposalButton } from '@/components/crm/NewProposalButton';
+import { useProposalStore } from '@/store/useProposalStore';
+import { grandTotal } from '@/lib/pricing';
+import { familyLabel, isApproved } from '@/lib/proposalFamily';
+import type { Proposal } from '@/types';
 import { useCanWrite } from '@/lib/crm/role';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
 import { useTeam, memberName } from '@/lib/crm/api/team';
@@ -75,8 +79,44 @@ const TYPE_ICON: Record<ActivityType, React.ReactNode> = {
   field_change: <Pencil className="h-3.5 w-3.5" />,
 };
 
+
+/** What a single piece of paperwork is right now. */
+function docState(doc?: Proposal): { label: string; className: string } {
+  if (!doc) return { label: 'Not on this device', className: 'bg-gray-100 text-brand-steel' };
+  if (doc.kind === 'change_order')
+    return isApproved(doc)
+      ? { label: `${familyLabel(doc)} approved`, className: 'bg-green-100 text-green-800' }
+      : { label: `${familyLabel(doc)} draft`, className: 'bg-gray-100 text-brand-steel' };
+  if (doc.supersededBy) return { label: 'Replaced', className: 'bg-gray-100 text-brand-steel' };
+  if (doc.notChosen) return { label: 'Not chosen', className: 'bg-gray-100 text-brand-steel' };
+  if (doc.status === 'contract' || doc.status === 'accepted')
+    return { label: 'Contract', className: 'bg-brand-black text-brand-orange-light' };
+  if (doc.status === 'declined') return { label: 'Declined', className: 'bg-red-100 text-red-700' };
+  if (doc.status === 'sent') return { label: 'Proposal sent', className: 'bg-brand-orange/15 text-brand-orange' };
+  return { label: 'Draft proposal', className: 'bg-gray-100 text-brand-steel' };
+}
+
+/** The one-line answer to "what stage is this job's paperwork at?" */
+function paperworkState(docs: (Proposal | undefined)[]): { label: string; className: string } {
+  const live = docs.filter((d): d is Proposal => Boolean(d) && !d!.deletedAt);
+  const contracts = live.filter((d) => d.kind !== 'change_order' && (d.status === 'contract' || d.status === 'accepted'));
+  if (contracts.length) {
+    const cos = live.filter((d) => d.kind === 'change_order' && isApproved(d)).length;
+    return {
+      label: cos ? `Contract + ${cos} change order${cos === 1 ? '' : 's'}` : 'Contract',
+      className: 'bg-brand-black text-brand-orange-light',
+    };
+  }
+  const open = live.filter((d) => d.kind !== 'change_order' && !d.supersededBy && !d.notChosen);
+  if (open.some((d) => d.status === 'sent'))
+    return { label: 'Proposal sent', className: 'bg-brand-orange/15 text-brand-orange' };
+  if (open.length) return { label: 'Proposal in progress', className: 'bg-gray-100 text-brand-steel' };
+  return { label: 'No proposal yet', className: 'bg-amber-100 text-amber-800' };
+}
+
 export default function ContactDetail() {
   const canWrite = useCanWrite();
+  const localProposals = useProposalStore((st) => st.proposals);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: contact, isLoading } = useContact(id);
@@ -118,7 +158,7 @@ export default function ContactDetail() {
         key: `d-${d.id}`,
         at: d.created_at,
         icon: <Briefcase className="h-3.5 w-3.5" />,
-        title: `Deal created — ${d.title}`,
+        title: `Job created — ${d.title}`,
         detail: `${STAGE_META[d.stage].label} · ${formatDollars(d.value)}`,
       });
     }
@@ -141,9 +181,9 @@ export default function ContactDetail() {
     // create button in the brief) — prefilled title, Inquiry stage.
     try {
       await createDeal.mutateAsync({ contact_id: contact.id, title: `${contact.name} — new project` });
-      toast.success('Deal created at Inquiry');
+      toast.success('Job created at Inquiry');
     } catch (err) {
-      toast.error('Could not create deal', err instanceof Error ? err.message : String(err));
+      toast.error('Could not create job', err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -214,7 +254,7 @@ export default function ContactDetail() {
           </Button>}
           {canWrite && <NewProposalButton contact={contact} />}
           <Button size="sm" onClick={newDeal} disabled={createDeal.isPending}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> New deal
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> New job
           </Button>
           <Button variant="outline" size="sm" title="Archive or delete this contact"
             className="text-brand-steel hover:text-red-600"
@@ -240,12 +280,20 @@ export default function ContactDetail() {
       {deals.length > 0 && (
         <div className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-brand-black">
-            Deals {openDeals.length > 0 && <span className="text-brand-steel">({openDeals.length} open)</span>}
+            Jobs {openDeals.length > 0 && <span className="text-brand-steel">({openDeals.length} open)</span>}
           </h2>
+          <p className="text-xs text-brand-steel">
+            One job per building. The paperwork for it — proposals, the contract, change orders —
+            is listed underneath.
+          </p>
           <div className="mt-2 grid gap-2">
             {deals.map((d) => {
               const isOpen = !['won', 'lost'].includes(d.stage);
               const dealProposals = proposalLinks.filter((pl) => pl.deal_id === d.id);
+              const docs = dealProposals
+                .map((pl) => ({ link: pl, doc: localProposals[pl.proposal_id] }))
+                .filter((x) => !x.doc?.deletedAt);
+              const paperwork = paperworkState(docs.map((x) => x.doc));
               return (
                 <div key={d.id} className="rounded-md border px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
@@ -258,13 +306,17 @@ export default function ContactDetail() {
                       {STAGE_META[d.stage].label}
                     </span>
                     <Badge variant="secondary" className="text-[10px]">{SEGMENT_META[d.segment].short}</Badge>
+                    {/* what the paperwork actually is, at a glance */}
+                    <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', paperwork.className)}>
+                      {paperwork.label}
+                    </span>
                     <span className="ml-auto text-brand-steel">{formatDollars(d.value)}</span>
                   </Link>
                   {iAmAdmin && isOpen ? (
                     <select
                       value={d.assigned_to ?? ''}
                       disabled={assign.isPending}
-                      title="Who owns this deal"
+                      title="Who owns this job"
                       onChange={async (e) => {
                         const toEmail = e.target.value || null;
                         try {
@@ -297,19 +349,27 @@ export default function ContactDetail() {
                     </Badge>
                   ) : null}
                 </div>
-                {/* a deal IS the working project — its proposals live inside it */}
-                {dealProposals.length > 0 && (
+                {/* the paperwork for this job, each piece saying what it is */}
+                {docs.length > 0 && (
                   <div className="mt-1.5 grid gap-1 border-t pt-1.5">
-                    {dealProposals.map((pl) => (
+                    {docs.map(({ link: pl, doc }) => (
                       <div key={pl.id} className="flex flex-wrap items-center gap-2 pl-4 text-xs">
                         <FileText className="h-3 w-3 shrink-0 text-brand-steel" />
-                        <span className="min-w-0 flex-1 truncate font-medium">{pl.title || 'Proposal'}</span>
-                        <span className="text-brand-steel">{formatDollars(pl.total)}</span>
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {doc?.proposalNumber ?? pl.title ?? 'Proposal'}
+                          {doc && (doc.versionName ? ` — ${doc.versionName}` : '')}
+                        </span>
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', docState(doc).className)}>
+                          {docState(doc).label}
+                        </span>
+                        <span className="text-brand-steel">
+                          {formatDollars(doc ? Math.round(grandTotal(doc)) : pl.total)}
+                        </span>
                         <Link
-                          to={`/crm/pipeline?deal=${d.id}`}
+                          to={doc ? `/proposal/${doc.id}/versions` : `/crm/pipeline?deal=${d.id}`}
                           className="text-brand-orange hover:underline"
                         >
-                          Open in deal
+                          {doc ? 'Open' : 'Open in job'}
                         </Link>
                         {pl.share_url && (
                           <a href={pl.share_url} target="_blank" rel="noreferrer" className="text-brand-orange hover:underline">

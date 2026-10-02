@@ -68,7 +68,7 @@ export default function Tasks() {
     // attaching it to the selected contact only when one is chosen; the DB
     // requires a parent, so with none chosen we require picking one.
     if (!contactId) {
-      toast.error('Pick a contact', 'Every task hangs on a contact (or a deal from its drawer).');
+      toast.error('Pick a contact', 'Every task hangs on a contact (or a job from its drawer).');
       return;
     }
     try {

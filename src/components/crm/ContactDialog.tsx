@@ -209,7 +209,7 @@ export function ContactDialog({ open, onOpenChange, contact, onCreated }: Props)
               onChange={(v) => set({ source_detail: v })}
             />
           </Field>
-          <Field label="Type — what they are to us (pipeline status lives on the deal)">
+          <Field label="Type — what they are to us (pipeline status lives on the job)">
             <Select value={form.type} onValueChange={(v) => set({ type: v })}>
               <SelectTrigger>
                 <SelectValue />

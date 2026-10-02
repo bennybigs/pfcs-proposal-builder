@@ -146,7 +146,7 @@ export default function Leads() {
 
       {canWrite && unassigned.length > 0 && (
         <div className="mt-6">
-          <Section title="Unassigned deals" hint="past the Lead stage but nobody owns them">
+          <Section title="Unassigned jobs" hint="past the Lead stage but nobody owns them">
             {unassigned.map((d) => (
               <UnassignedRow key={d.id} deal={d} contact={contactById.get(d.contact_id)} team={team} me={me} />
             ))}

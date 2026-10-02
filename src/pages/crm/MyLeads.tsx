@@ -111,7 +111,7 @@ export default function MyLeads() {
           <Briefcase className="mx-auto h-6 w-6 text-brand-steel/50" />
           <p className="mt-2 font-medium text-brand-black">Nothing assigned to you yet.</p>
           <p className="mt-1 text-sm text-brand-steel">
-            When a deal is assigned to you, it shows up here and you get a notification.
+            When a job is assigned to you, it shows up here and you get a notification.
           </p>
         </div>
       ) : (

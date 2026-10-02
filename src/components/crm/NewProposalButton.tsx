@@ -22,7 +22,7 @@ export function NewProposalButton({
   size = 'sm',
 }: {
   contact: Contact;
-  deal?: Deal; // set when launched from the deal drawer — skips resolution
+  deal?: Deal; // set when launched from the job drawer — skips resolution
   size?: 'sm' | 'default';
 }) {
   const navigate = useNavigate();
@@ -70,7 +70,7 @@ export function NewProposalButton({
       <Dialog open={!!choices} onOpenChange={(o) => !o && setChoices(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Which deal is this proposal for?</DialogTitle>
+            <DialogTitle>Which job is this proposal for?</DialogTitle>
           </DialogHeader>
           <div className="grid gap-2">
             {(choices ?? []).map((d) => (

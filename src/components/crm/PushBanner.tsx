@@ -61,7 +61,7 @@ export function PushBanner() {
           <>
             <BellRing className="h-4 w-4 shrink-0 text-brand-orange" />
             <span className="min-w-0 flex-1">
-              Get a buzz on this device when a lead comes in or a deal is assigned to you.
+              Get a buzz on this device when a lead comes in or a job is assigned to you.
             </span>
             <Button size="sm" className="h-7" onClick={enable} disabled={busy}>
               {busy ? 'Enabling…' : 'Enable notifications'}

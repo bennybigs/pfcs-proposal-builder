@@ -76,7 +76,7 @@ export function CrmLinkControl({ proposal }: { proposal: Proposal }) {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)} title="Link this proposal to a CRM contact & deal">
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)} title="Link this proposal to a CRM contact & job">
         <Link2 className="h-4 w-4" />
         <span className="hidden xl:inline">Link to CRM</span>
       </Button>
@@ -204,7 +204,7 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
       try { await promoteLeadOnDeal(picked.id); } catch { /* non-fatal */ }
       await finish(picked, data as Deal);
     } catch (err) {
-      toast.error('Could not create deal', err instanceof Error ? err.message : String(err));
+      toast.error('Could not create job', err instanceof Error ? err.message : String(err));
       setBusy(false);
     }
   };
@@ -285,7 +285,7 @@ function LinkDialog({ proposal, onClose }: { proposal: Proposal; onClose: () => 
               </button>
             ))}
             <Button onClick={createDealAndFinish} disabled={busy}>
-              New deal: “{proposal.project.referenceName || `${picked.name} — new project`}”
+              New job: “{proposal.project.referenceName || `${picked.name} — new project`}”
             </Button>
             <Button variant="outline" onClick={() => setPicked(null)}>
               Back

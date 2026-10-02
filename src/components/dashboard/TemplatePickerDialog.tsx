@@ -4,7 +4,7 @@
 // Every proposal is therefore born attached to a CRM contact and a deal, so
 // nothing lands in the builder as an orphan the way "Mitchell (driveway
 // extension)" did. Pick an existing contact or create one right here; the
-// deal is resolved the same way NewProposalButton does it.
+// job is resolved the same way NewProposalButton does it.
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Search, UserPlus } from 'lucide-react';

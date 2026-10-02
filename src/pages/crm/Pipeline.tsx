@@ -177,7 +177,7 @@ export default function Pipeline() {
       await move.mutateAsync({ deal, to });
       toast.success(`${STAGE_META[deal.stage].label} → ${STAGE_META[to].label}`);
     } catch (err) {
-      toast.error('Could not move deal', err instanceof Error ? err.message : String(err));
+      toast.error('Could not move job', err instanceof Error ? err.message : String(err));
     }
   };
 
