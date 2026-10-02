@@ -59,6 +59,7 @@ import {
   type DealStage,
 } from '@/lib/crm/types';
 import type { TeamMember } from '@/lib/crm/api/team';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export default function Pipeline() {
@@ -215,7 +216,7 @@ export default function Pipeline() {
                 : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
             )}
           >
-            ⚠ Needs attention ({attentionCount})
+            ⚠ Needs attention ({attentionCount}){attentionOnly ? ' · showing only these' : ''}
           </button>
         )}
         <div className="flex-1" />
@@ -250,6 +251,34 @@ export default function Pipeline() {
           </button>
         ))}
       </div>
+
+      {/* a filter never hides work silently — say what's hidden and undo it */}
+      {(attentionOnly || segment || assignee) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border-2 border-brand-orange/50 bg-brand-orange/5 px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1 text-brand-black">
+            Showing <strong>{visible.length}</strong> of {activeDeals.length} jobs
+            {attentionOnly ? ' — only those needing attention' : ''}
+            {segment ? ` · ${SEGMENT_META[segment].short}` : ''}
+            {assignee === '__unassigned__'
+              ? ' · unassigned'
+              : assignee
+                ? ` · ${memberName(team, assignee)}`
+                : ''}
+            . The rest are still here.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setAttentionOnly(false);
+              setSegment(null);
+              setAssignee('');
+            }}
+          >
+            Show all jobs
+          </Button>
+        </div>
+      )}
 
       {/* dashboard strip */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 text-xs">

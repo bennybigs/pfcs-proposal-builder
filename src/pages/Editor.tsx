@@ -45,6 +45,7 @@ import { uuid } from '@/lib/uuid';
 import { cn } from '@/lib/utils';
 import { familyLabel, familyOf, latestOf, lockReason } from '@/lib/proposalFamily';
 import { createVersion, discardVersion, saveVersion, versionName } from '@/lib/crm/integration/versions';
+import { emptyJobAfterDelete, removeEmptyJob, type EmptyJob } from '@/lib/crm/integration/emptyJob';
 import { TemplatePickerDialog } from '@/components/dashboard/TemplatePickerDialog';
 import { ConflictBanner } from '@/components/dashboard/ConflictBanner';
 import { formatDateUS } from '@/lib/format';
@@ -78,6 +79,8 @@ export default function Editor() {
   const [copyOpen, setCopyOpen] = useState(false);
   // leaving an unsaved revision/option: where we were headed
   const [leaveTo, setLeaveTo] = useState<null | (() => void)>(null);
+  // a job left behind with no paperwork after its last proposal was deleted
+  const [emptyJob, setEmptyJob] = useState<EmptyJob | null>(null);
   // "Edit this version anyway" — per visit, never remembered
   const [unlockedId, setUnlockedId] = useState<string | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -335,8 +338,12 @@ export default function Editor() {
         onCopyForCustomer={() => setCopyOpen(true)}
         onDelete={() => {
           if (pending) return doDiscard();
+          const gone = proposal;
           deleteProposal(proposal.id);
-          navigate('/');
+          void emptyJobAfterDelete(gone).then((job) => {
+            if (job) setEmptyJob(job);
+            else navigate('/');
+          });
         }}
       />
 
@@ -648,6 +655,38 @@ export default function Editor() {
               }}
             >
               Save {versionName(proposal)}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* the proposal is gone — its empty job card shouldn't linger on the board */}
+      <Dialog open={!!emptyJob} onOpenChange={(o) => { if (!o) { setEmptyJob(null); navigate('/'); } }}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Remove the empty job too?</DialogTitle>
+          <p className="text-sm text-brand-steel">
+            “{emptyJob?.title}” was created for this proposal and now has no paperwork on it, no
+            calls and no notes. Left alone it stays on the pipeline looking like live work.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => { setEmptyJob(null); navigate('/'); }}>
+              Keep the job
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const job = emptyJob!;
+                setEmptyJob(null);
+                try {
+                  await removeEmptyJob(job.dealId);
+                  toast.success('Job removed', `“${job.title}” is off the pipeline.`);
+                } catch (err) {
+                  toast.error('Could not remove the job', err instanceof Error ? err.message : String(err));
+                }
+                navigate('/');
+              }}
+            >
+              Remove the job
             </Button>
           </div>
         </DialogContent>
