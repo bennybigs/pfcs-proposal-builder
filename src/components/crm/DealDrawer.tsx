@@ -1103,7 +1103,7 @@ function Panel({
   return (
     <section
       className={cn(
-        'mt-3 rounded-lg border p-3 shadow-sm',
+        'panel-edge mt-3 rounded-lg border-2 p-3 shadow-sm',
         // bg-gray-100 has a dark-mode rule; an opacity variant would not
         tone === 'quiet' ? 'bg-gray-100' : 'bg-white'
       )}
