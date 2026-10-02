@@ -7,6 +7,7 @@ import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase, CRM_ENABLED } from '@/lib/supabase';
+import { DevSignIn } from '@/components/crm/DevSignIn';
 import { AppHeader } from '@/components/layout/AppHeader';
 
 type TeamState = 'checking' | 'member' | 'outsider';
@@ -206,6 +207,7 @@ function SignIn() {
               )}
             </>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          <DevSignIn />
         </div>
       </div>
     </Shell>

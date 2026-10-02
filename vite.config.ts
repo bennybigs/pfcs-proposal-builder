@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { devLogin } from './vite-plugin-dev-login';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 import tailwindcss from 'tailwindcss';
@@ -10,6 +11,7 @@ import autoprefixer from 'autoprefixer';
 export default defineConfig({
   plugins: [
     react(),
+    devLogin(), // localhost one-click sign-in; apply: 'serve' keeps it out of builds
     VitePWA({
       // injectManifest: we ship our own service worker (src/sw.ts) because
       // web push needs push/notificationclick handlers generateSW can't add.
