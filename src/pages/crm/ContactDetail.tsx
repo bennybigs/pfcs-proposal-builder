@@ -35,6 +35,7 @@ import { NewProposalButton } from '@/components/crm/NewProposalButton';
 import { useProposalStore } from '@/store/useProposalStore';
 import { grandTotal } from '@/lib/pricing';
 import { familyLabel, isApproved } from '@/lib/proposalFamily';
+import { STATE_META, docState } from '@/lib/proposalStatus';
 import type { Proposal } from '@/types';
 import { useCanWrite } from '@/lib/crm/role';
 import { useContact, useContactMutations } from '@/lib/crm/api/contacts';
@@ -80,35 +81,33 @@ const TYPE_ICON: Record<ActivityType, React.ReactNode> = {
 };
 
 
-/** What a single piece of paperwork is right now. */
-function docState(doc?: Proposal): { label: string; className: string } {
+/** What a single piece of paperwork is right now — same words as everywhere. */
+function docBadge(doc?: Proposal): { label: string; className: string } {
   if (!doc) return { label: 'Not on this device', className: 'bg-gray-100 text-brand-steel' };
-  if (doc.kind === 'change_order')
-    return isApproved(doc)
-      ? { label: `${familyLabel(doc)} approved`, className: 'bg-green-100 text-green-800' }
-      : { label: `${familyLabel(doc)} draft`, className: 'bg-gray-100 text-brand-steel' };
   if (doc.supersededBy) return { label: 'Replaced', className: 'bg-gray-100 text-brand-steel' };
-  if (doc.notChosen) return { label: 'Not chosen', className: 'bg-gray-100 text-brand-steel' };
-  if (doc.status === 'contract' || doc.status === 'accepted')
-    return { label: 'Contract', className: 'bg-brand-black text-brand-orange-light' };
-  if (doc.status === 'declined') return { label: 'Declined', className: 'bg-red-100 text-red-700' };
-  if (doc.status === 'sent') return { label: 'Proposal sent', className: 'bg-brand-orange/15 text-brand-orange' };
-  return { label: 'Draft proposal', className: 'bg-gray-100 text-brand-steel' };
+  const meta = STATE_META[docState(doc)];
+  if (doc.kind === 'change_order')
+    return { label: `${familyLabel(doc)} · ${meta.short}`, className: meta.className };
+  return { label: meta.label === 'With the customer' ? 'Proposal sent' : meta.label, className: meta.className };
 }
 
 /** The one-line answer to "what stage is this job's paperwork at?" */
 function paperworkState(docs: (Proposal | undefined)[]): { label: string; className: string } {
   const live = docs.filter((d): d is Proposal => Boolean(d) && !d!.deletedAt);
-  const contracts = live.filter((d) => d.kind !== 'change_order' && (d.status === 'contract' || d.status === 'accepted'));
+  const contracts = live.filter(
+    (d) => d.kind !== 'change_order' && ['contract', 'signed'].includes(docState(d))
+  );
   if (contracts.length) {
     const cos = live.filter((d) => d.kind === 'change_order' && isApproved(d)).length;
+    const signed = contracts.some((d) => docState(d) === 'signed');
+    const base = signed ? 'Contract signed' : 'Contract — awaiting signature';
     return {
-      label: cos ? `Contract + ${cos} change order${cos === 1 ? '' : 's'}` : 'Contract',
-      className: 'bg-brand-black text-brand-orange-light',
+      label: cos ? `${base} + ${cos} change order${cos === 1 ? '' : 's'}` : base,
+      className: signed ? 'bg-brand-black text-brand-orange-light' : 'bg-brand-orange/15 text-brand-orange',
     };
   }
   const open = live.filter((d) => d.kind !== 'change_order' && !d.supersededBy && !d.notChosen);
-  if (open.some((d) => d.status === 'sent'))
+  if (open.some((d) => docState(d) === 'sent'))
     return { label: 'Proposal sent', className: 'bg-brand-orange/15 text-brand-orange' };
   if (open.length) return { label: 'Proposal in progress', className: 'bg-gray-100 text-brand-steel' };
   return { label: 'No proposal yet', className: 'bg-amber-100 text-amber-800' };
@@ -359,8 +358,8 @@ export default function ContactDetail() {
                           {doc?.proposalNumber ?? pl.title ?? 'Proposal'}
                           {doc && (doc.versionName ? ` — ${doc.versionName}` : '')}
                         </span>
-                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', docState(doc).className)}>
-                          {docState(doc).label}
+                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', docBadge(doc).className)}>
+                          {docBadge(doc).label}
                         </span>
                         <span className="text-brand-steel">
                           {formatDollars(doc ? Math.round(grandTotal(doc)) : pl.total)}

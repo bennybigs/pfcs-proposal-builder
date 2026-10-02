@@ -28,6 +28,8 @@ import { formatCurrency, formatDateUS } from '@/lib/format';
 import type { Proposal } from '@/types';
 import { createVersion, discardVersion, versionName } from '@/lib/crm/integration/versions';
 import { familyLabel } from '@/lib/proposalFamily';
+import { StatusPill } from '@/components/proposal/StatusControl';
+import { docState } from '@/lib/proposalStatus';
 import { ConflictBanner } from '@/components/dashboard/ConflictBanner';
 
 export default function Dashboard() {
@@ -56,15 +58,16 @@ export default function Dashboard() {
   // replaced are one tap away ("Show replaced versions"), never lost
   const replaced = all.filter((p) => p.supersededBy && !p.archivedAt);
   const active = all.filter((p) => !p.archivedAt && !p.supersededBy);
-  const list = active.filter((p) => p.status !== 'contract');
-  const contracts = active.filter((p) => p.status === 'contract');
+  // contracts (signed or awaiting signature) sit in their own section
+  const list = active.filter((p) => !['contract', 'signed'].includes(docState(p)));
+  const contracts = active.filter((p) => ['contract', 'signed'].includes(docState(p)));
   const archived = all.filter((p) => p.archivedAt);
 
   const renderGrid = (items: Proposal[]) => (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {items.map((p) => {
-        const status = STATUS_META[p.status] ?? STATUS_META.draft;
-        const isContract = p.status === 'contract';
+        const state = docState(p);
+        const isContract = state === 'contract' || state === 'signed';
         // the version chip only says something once there is more than one
         const base = p.lineage?.baseNumber ?? p.proposalNumber;
         const family = all.filter((q) => (q.lineage?.baseNumber ?? q.proposalNumber) === base);
@@ -86,15 +89,13 @@ export default function Dashboard() {
             <Link to={`/proposal/${p.id}/versions`} className="block">
               <div className="flex items-start justify-between gap-2 pr-8">
                 <div className="text-xs font-semibold text-brand-steel">{p.proposalNumber}</div>
-                <Badge className={status.className} variant="secondary">
-                  {p.archivedAt
-                    ? 'Archived'
-                    : p.supersededBy
-                      ? 'Replaced'
-                      : p.notChosen
-                        ? 'Not chosen'
-                        : status.label}
-                </Badge>
+                {p.archivedAt ? (
+                  <Badge variant="secondary">Archived</Badge>
+                ) : p.supersededBy ? (
+                  <Badge variant="secondary">Replaced</Badge>
+                ) : (
+                  <StatusPill proposal={p} />
+                )}
               </div>
               <div className="mt-1 font-heading text-lg font-bold uppercase tracking-wide">
                 {p.project.referenceName || 'Untitled Project'}

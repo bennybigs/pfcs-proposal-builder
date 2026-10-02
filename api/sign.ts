@@ -136,7 +136,7 @@ export default async function handler(req: any, res: any) {
   });
 
   // `internal` = the project manager's notification (carries IP + the
-  // mark-as-contract link). The signer's copy omits both.
+  // mark-as-signed link). The signer's copy omits both.
   const buildText = (internal: boolean) =>
     [
       `${docLabel === 'Proposal' ? 'Proposal:     ' : 'Document:     '} ${proposalNumber} — ${projectName}${docKind === 'terms' ? ' (Terms and Conditions)' : ''}`,
@@ -154,7 +154,7 @@ export default async function handler(req: any, res: any) {
       `contract phase."`,
       ``,
       documentUrl ? `Signed document: ${documentUrl}` : null,
-      internal && markContractUrl ? `Mark as Contract:  ${markContractUrl}` : null,
+      internal && markContractUrl ? `Record the signature:  ${markContractUrl}` : null,
       ``,
       `Keep this email — it is the record of the electronic acceptance.`,
     ]
@@ -189,7 +189,7 @@ export default async function handler(req: any, res: any) {
         ? `<p style="margin:20px 0"><a href="${escapeHtml(markContractUrl)}"
              style="background:#E8930C;color:#fff;text-decoration:none;padding:12px 22px;
                     border-radius:6px;font-weight:bold;display:inline-block">
-             Open &amp; mark as Contract</a></p>`
+             Open &amp; record the signature</a></p>`
         : ''
     }
     ${documentUrl ? `<p><a href="${escapeHtml(documentUrl)}" style="color:#E8930C">Open the signed proposal</a></p>` : ''}

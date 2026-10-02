@@ -102,7 +102,11 @@ export default function Editor() {
   useEffect(() => {
     if (searchParams.get('signed') !== '1' || !id) return;
     const signer = searchParams.get('by') || 'the customer';
-    updateProposal(id, { status: 'contract' });
+    updateProposal(id, {
+      status: 'contract',
+      executedAt: new Date().toISOString(),
+      executedBy: signer,
+    });
     setSignedBanner(signer);
     const next = new URLSearchParams(searchParams);
     next.delete('signed');
@@ -400,10 +404,10 @@ export default function Editor() {
                   <Check className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
                   <div className="text-sm text-green-900">
                     <div className="font-heading text-base font-bold uppercase tracking-wide">
-                      Signed — moved to Contract
+                      Signed
                     </div>
-                    Electronically signed by <strong>{signedBanner}</strong>. This proposal now
-                    appears under Contracts on the dashboard.
+                    Electronically signed by <strong>{signedBanner}</strong>. It&apos;s executed
+                    work now — changes from here go on a change order.
                   </div>
                   <button
                     className="ml-auto text-green-700 hover:text-green-900"

@@ -23,6 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { Proposal } from '@/types';
+import { StatusControl } from '@/components/proposal/StatusControl';
 import { flushToDisk } from '@/store/persistence';
 import { requestSync } from '@/lib/builderSync';
 import { cn } from '@/lib/utils';
@@ -191,23 +192,16 @@ export function TopBar({
               </>
             )}
           </span>
-          <Select
-            value={proposal.status}
-            onValueChange={(v) =>
-              updateProposal(proposal.id, { status: v as Proposal['status'] })
-            }
-          >
-            <SelectTrigger className="hidden h-7 w-[110px] text-xs md:flex">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(STATUS_META).map(([value, meta]) => (
-                <SelectItem key={value} value={value}>
-                  {meta.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* where it stands + what to do next — the same control the
+              preview toolbar uses, so both agree */}
+          <div className="hidden md:block">
+            <StatusControl
+              proposal={proposal}
+              onSend={onSend}
+              onChangeOrder={canChangeOrder ? onChangeOrder : undefined}
+              showHint={false}
+            />
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -258,7 +252,9 @@ export function TopBar({
               </>
             )}
           </Button>
-          <Button size="sm" onClick={onSend}>
+          {/* phones don't get the status control (no room) — they keep a
+              plain Send button */}
+          <Button size="sm" className="md:hidden" onClick={onSend}>
             <Send className="h-4 w-4" /> <span className="hidden sm:inline">Send…</span>
           </Button>
           {/* phones: one labeled menu instead of a row of mystery icons */}

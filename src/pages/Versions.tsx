@@ -1,9 +1,10 @@
 // Opening a proposal shows it the way the customer sees it, with every
 // version of that quote listed down the left — each titled and stamped — and
-// the things you can do along the top: Edit, Revise, Duplicate, Send.
+// the things you can do along the top: Edit, Revise, Duplicate, and the
+// status control (Send / Convert to contract / Mark signed / Change order).
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Copy, FileSignature, FilePlus2, Pencil, Plus, Printer, ScrollText, Send } from 'lucide-react';
+import { ArrowLeft, Copy, Pencil, Plus, Printer, ScrollText } from 'lucide-react';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CustomerProposal } from '@/components/customer/CustomerProposal';
+import { StatusControl } from '@/components/proposal/StatusControl';
+import { STATE_META, docState } from '@/lib/proposalStatus';
 import { CancellationNotice } from '@/components/customer/CancellationNotice';
 import { SendProposalDialog } from '@/components/editor/SendProposalDialog';
 import { toast } from '@/components/ui/toast';
@@ -50,8 +53,7 @@ const stamp = (iso?: string) => {
 function stateOf(p: Proposal) {
   if (p.archivedAt) return 'Archived';
   if (p.supersededBy) return 'Replaced';
-  if (p.notChosen) return 'Not chosen';
-  return (STATUS_META[p.status] ?? STATUS_META.draft).label;
+  return STATE_META[docState(p)].short;
 }
 
 export default function Versions() {
@@ -65,7 +67,6 @@ export default function Versions() {
   const [name, setName] = useState('');
   const [sendOpen, setSendOpen] = useState(false);
   const [nocOpen, setNocOpen] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
   const updateProposal = useProposalStore((s) => s.updateProposal);
 
   useEffect(() => setShowId(id), [id]);
@@ -171,19 +172,12 @@ export default function Versions() {
           >
             <Copy className="h-4 w-4" /> Duplicate → Version {nextLetter}
           </Button>
-          {!viewingCo && !closed && !isApproved(shown) && (
-            <Button size="sm" variant="outline" onClick={() => setConvertOpen(true)}>
-              <FileSignature className="h-4 w-4" /> Convert to contract
-            </Button>
-          )}
-          {signed && (
-            <Button size="sm" variant="outline" onClick={newChangeOrder}>
-              <FilePlus2 className="h-4 w-4" /> Change order
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => window.print()} title="Print what you're looking at (or save it as a PDF)">
-            <Printer className="h-4 w-4" /> Print
-          </Button>
+          <StatusControl
+            proposal={shown}
+            onSend={() => setSendOpen(true)}
+            onPrint={() => window.print()}
+            onChangeOrder={newChangeOrder}
+          />
           <Button
             size="sm"
             variant="outline"
@@ -192,9 +186,7 @@ export default function Versions() {
           >
             <ScrollText className="h-4 w-4" /> Cancellation notice
           </Button>
-          <Button size="sm" onClick={() => setSendOpen(true)}>
-            <Send className="h-4 w-4" /> Send…
-          </Button>
+
         </div>
       </div>
 
@@ -323,42 +315,6 @@ export default function Versions() {
         onMailApp={() => undefined}
         afterSent={(url) => logProposalEvent(shown, 'share', url)}
       />
-
-      {/* Convert to contract — what changes is spelled out before it happens */}
-      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Convert {familyLabel(shown)} to the contract?</DialogTitle>
-            <DialogDescription>
-              Use this when the customer has accepted — signed the printed copy, or told you yes.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="grid gap-1.5 text-sm text-brand-steel">
-            <li>• The Standard Terms and Conditions attach to the document.</li>
-            <li>• Signature lines appear for both parties.</li>
-            <li>• Change orders become available against it.</li>
-            <li>• Today&apos;s date is recorded as the contract date.</li>
-          </ul>
-          <p className="text-xs text-brand-steel">
-            Nothing is sent to the customer. You can set it back to Sent from the editor if you
-            convert one by mistake.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConvertOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                updateProposal(shown.id, { status: 'contract' });
-                setConvertOpen(false);
-                toast.success(`${shown.proposalNumber} is now the contract`, 'Terms and signature lines are attached. Print it, or start a change order.');
-              }}
-            >
-              <FileSignature className="h-4 w-4" /> Convert to contract
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Notice of Cancellation — its own sheet, printed when we choose to */}
       <Dialog open={nocOpen} onOpenChange={setNocOpen}>
