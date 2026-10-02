@@ -329,7 +329,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
   return (
     <Sheet open={!!deal} onOpenChange={(o) => !o && requestClose()}>
-      <SheetContent className="w-full overflow-y-auto pb-24 sm:max-w-md">
+      <SheetContent className="w-full overflow-y-auto bg-brand-gray-bg pb-24 sm:max-w-md">
         <SheetHeader>
           <div className="flex items-start gap-2 pr-8">
             <SheetTitle className="min-w-0 flex-1">{draft.title || deal.title}</SheetTitle>
@@ -378,7 +378,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
 
         {/* one-touch outreach — disabled honestly when the phone is bad */}
         {contact && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Panel className="flex flex-wrap items-center gap-2">
             <Button asChild={phoneOk} size="sm" variant="outline" className="flex-1" disabled={!phoneOk}>
               {phoneOk ? (
                 <a
@@ -433,7 +433,7 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
                 {contact.phone ? `"${contact.phone}" isn't a dialable number — fix it` : 'Add a phone number'}
               </button>
             )}
-          </div>
+          </Panel>
         )}
 
         {/* pinned intake note — the customer's original words */}
@@ -443,8 +443,8 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
         {contact && canWrite && <NoteComposer contactId={contact.id} dealId={deal.id} />}
 
         {/* ── editable record ── */}
-        <div className="mt-4 grid gap-3">
-          <SectionLabel>Contact — edits update this person everywhere</SectionLabel>
+        <Panel title="Contact" hint="edits update this person everywhere">
+          <div className="grid gap-3">
           <Field label="Name">
             <Input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
           </Field>
@@ -501,7 +501,11 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
             </Select>
           </Field>
 
-          <SectionLabel>Job</SectionLabel>
+          </div>
+        </Panel>
+
+        <Panel title="Job">
+          <div className="grid gap-3">
           <Field label="Title">
             <Input value={draft.title} onChange={(e) => set({ title: e.target.value })} />
           </Field>
@@ -552,18 +556,18 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               </p>
             )}
           </Field>
-        </div>
+          </div>
+        </Panel>
 
         {/* Proposals — tap to view, Edit to work on it, one checkbox decides
-            which proposal IS this deal's value (kept in sync automatically) */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-brand-black">Proposals</h3>
-            {contact && canWrite && <NewProposalButton contact={contact} deal={deal} />}
-          </div>
+            which proposal IS this job's value (kept in sync automatically) */}
+        <Panel
+          title="Proposals"
+          action={contact && canWrite ? <NewProposalButton contact={contact} deal={deal} /> : null}
+        >
           {links.length === 0 ? (
             <p className="mt-1 text-xs text-brand-steel">
-              None yet — “New proposal” starts one attached to this deal.
+              None yet — “New proposal” starts one attached to this job.
             </p>
           ) : (
             <div className="mt-2 grid gap-2">
@@ -700,15 +704,18 @@ export function DealDrawer({ deal, contact, onClose }: Props) {
               })}
             </div>
           )}
-        </div>
+        </Panel>
 
-        {/* timeline */}
+        {/* timeline — a quieter card, so the history reads as the back of
+            the record rather than another form to fill in */}
         {contact && (
-          <Timeline
-            activities={activities}
-            me={me}
-            onChanged={() => qc.invalidateQueries({ queryKey: ['activities'] })}
-          />
+          <Panel tone="quiet">
+            <Timeline
+              activities={activities}
+              me={me}
+              onChanged={() => qc.invalidateQueries({ queryKey: ['activities'] })}
+            />
+          </Panel>
         )}
 
         {/* No second set of status buttons — the stage chip at the top is the
@@ -1070,6 +1077,50 @@ function Timeline({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One section of the drawer. Each sits on its own white card against the
+ * drawer's grey canvas, so the eye can find where contact ends and the job
+ * begins instead of reading one long column of fields.
+ */
+function Panel({
+  title,
+  hint,
+  action,
+  tone = 'plain',
+  className,
+  children,
+}: {
+  title?: string;
+  hint?: string;
+  action?: React.ReactNode;
+  tone?: 'plain' | 'quiet';
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        'mt-3 rounded-lg border p-3 shadow-sm',
+        // bg-gray-100 has a dark-mode rule; an opacity variant would not
+        tone === 'quiet' ? 'bg-gray-100' : 'bg-white'
+      )}
+    >
+      {(title || action) && (
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-brand-steel">
+              {title}
+            </h3>
+            {hint && <p className="text-[11px] text-brand-steel/80">{hint}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      <div className={className}>{children}</div>
+    </section>
   );
 }
 
